@@ -1,6 +1,8 @@
 
 import os
-from scripts.utils.data_downloader import download_data
+from scripts.utils.data_downloader import batch_maker, download_all_files
+
+
 
 
 folder_url_data = 'https://drive.google.com/drive/folders/1rWylF6dUeP2D8k39gMPGEUY4yBhyXGee?usp=sharing' # Dataset that contains the actual data (70+gb)
@@ -15,9 +17,15 @@ def main():
         if download_question == 'y':
             test_data_question = input('Do you wish to download the full dataset or the test? [full/test]: ').strip().lower()
             if test_data_question == 'test':
-                download_data(folder_url=folder_url_test, output_dir=output_dir)
-            elif test_data_question != 'full':
-                download_data(folder_url=folder_url_data, output_dir=output_dir)
+                print('Creating 50 file batches. This may take a while...')
+                entries = batch_maker(folder_url_test)
+                print(f"Found {len(entries)} files in the test dataset. Downloading...")
+                download_all_files(entries, output_dir)
+            elif test_data_question == 'full':
+                print('Creating 50 file batches. This may take a while...')
+                entries = batch_maker(folder_url_data)
+                print(f"Found {len(entries)} files in the test dataset. Downloading...")
+                download_all_files(entries, output_dir)
         else:
             print('You may now only run the inference script, as the data is missing.')
             return
