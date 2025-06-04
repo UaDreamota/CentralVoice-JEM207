@@ -73,14 +73,40 @@ class CremadPrecompDataset(Dataset):
                 if row.get("split", "").lower() != self.split:
                     continue
 
-                # ---------- expected file locations -------------------------
-                wav_file = self.root / "audio" / row["file"]          # not used
-                npy_file = self.root / "mfcc" / Path(row["file"]).with_suffix(".npy")
-                # ------------------------------------------------------------
+                # --------------- resolve feature path ---------------------
+                # Older label CSVs used a 'file' column containing just the
+                # basename; newer ones store a 'path' column relative to the
+                # repository root. Support both for backward compatibility.
+                file_field = row.get("file") or row.get("path")
+                if file_field is None:
+                    raise KeyError("Metadata missing 'file'/'path' column")
+
+                if row.get("file"):
+                    npy_file = self.root / "mfcc" / Path(file_field).with_suffix(".npy")
+                else:
+                    p = Path(file_field)
+                    npy_file = p if p.is_absolute() else REPO_ROOT / p
 
                 if not npy_file.exists():
                     raise FileNotFoundError(f"Feature file '{npy_file}' not found.")
-                self.items.append((npy_file, int(row["emotion"])))
+
+                emotion_raw = row["emotion"]
+                try:
+                    label = int(emotion_raw)
+                except ValueError:
+                    EMOTION_MAP = {
+                        "ANG": 0,
+                        "DIS": 1,
+                        "FEA": 2,
+                        "HAP": 3,
+                        "NEU": 4,
+                        "SAD": 5,
+                    }
+                    if emotion_raw not in EMOTION_MAP:
+                        raise ValueError(f"Unknown emotion label '{emotion_raw}'")
+                    label = EMOTION_MAP[emotion_raw]
+
+                self.items.append((npy_file, label))
 
         if not self.items:
             raise RuntimeError(
@@ -97,17 +123,16 @@ class CremadPrecompDataset(Dataset):
         feats_np: np.ndarray = np.load(npy_path)  # shape expected: (1, 1, C, T)
 
         if self.split == "train" and self.train_transform:
-            feats_np = self.train_transform(feats_np)
+            feats = self.train_transform(feats_np)
         elif self.split in {"dev", "val"} and self.dev_transform:
-            feats_np = self.dev_transform(feats_np)
+            feats = self.dev_transform(feats_np)
 
-        if feats_np.ndim != 4:
+        if feats.ndim != 4:
             raise ValueError(
                 "Each '.npy' must contain an array shaped (1, 1, C, T); "
                 f"got {feats_np.shape} from '{npy_path}'."
             )
 
-        feats = torch.from_numpy(feats_np).float()
         return feats, label
 
     # ------------------------------------------------------------- utilities
@@ -125,13 +150,13 @@ class CremadPrecompDataset(Dataset):
 class TrainTransform:
     """
     Transformation for training that expects input of shape (1, C, H_var, T_var)
-    and outputs a tensor of shape (1, C, 40, 208), with SpecAugment‐style
+    and outputs a tensor of shape (1, C, 40, 218), with SpecAugment‐style
     frequency & time masking.
 
     Parameters:
     -----------
     time_length : int
-        Desired time‐frame length (208).
+        Desired time‐frame length (218).
 
     freq_mask_param : int
         Maximum number of consecutive frequency bins to mask (e.g., 15). 
@@ -141,7 +166,7 @@ class TrainTransform:
         Maximum number of consecutive time frames to mask (e.g., 25). 
         Used by torchaudio.transforms.TimeMasking.
     """
-    def __init__(self, time_length: int = 208,
+    def __init__(self, time_length: int = 218,
                  freq_mask_param: int = 15,
                  time_mask_param: int = 25):
         self.time_length = time_length
@@ -161,12 +186,12 @@ class TrainTransform:
             - 1: “batch” dimension (always 1 here)
             - C: number of channels (often 1 for a single MFCC “image”)
             - H_var: number of MFCC coefficients (should be 40)
-            - T_var: variable time‐frames (to be padded/truncated to 208)
+            - T_var: variable time‐frames (to be padded/truncated to 218)
 
         Returns:
         --------
         torch.Tensor
-            Output tensor of shape (1, C, 40, 208), dtype=torch.float,
+            Output tensor of shape (1, C, 40, 218), dtype=torch.float,
             normalized (zero mean, unit variance) and with random freq/time
             masks applied (training‐only augmentation).
         """
@@ -196,11 +221,11 @@ class TrainTransform:
             # F.pad with a 2‐element tuple (pad_left, pad_right) pads only last dimension.
             # Here, pad=(0, pad_amount) → adds pad_amount zeros on the right side of the W dimension.
             mfcc = F.pad(mfcc, (0, pad_amount))
-            # After padding, new shape is (1, C, 40, 208)
+            # After padding, new shape is (1, C, 40, 218)
         elif T > self.time_length:
             # Truncate to the first `time_length` frames
             mfcc = mfcc[..., :self.time_length]
-            # After truncation, shape is (1, C, 40, 208)
+            # After truncation, shape is (1, C, 40, 218)
 
         # 6. Normalize per sample: compute mean and std over all values in the 4D tensor
         #    (batch=1, so effectively over that single sample).
@@ -214,7 +239,7 @@ class TrainTransform:
         #    operate on a 4D tensor. Thus, we iterate over batch and channels.
         for b in range(B):
             for c in range(C):
-                # Extract the (H, W) slice: shape (40, 208)
+                # Extract the (H, W) slice: shape (40, 218)
                 slice_2d = mfcc[b, c, :, :]
                 # 7a. Frequency masking: zero out up to freq_mask_param consecutive rows
                 slice_2d = self.freq_mask(slice_2d)
@@ -229,15 +254,15 @@ class TrainTransform:
 class DevTransform:
     """
     Transformation for validation/dev that expects input of shape (1, C, H_var, T_var)
-    and outputs a tensor of shape (1, C, 40, 208), with only padding/truncation
+    and outputs a tensor of shape (1, C, 40, 218), with only padding/truncation
     and normalization—no speculative masking.
 
     Parameters:
     -----------
     time_length : int
-        Desired time‐frame length (208).
+        Desired time‐frame length (218).
     """
-    def __init__(self, time_length: int = 208):
+    def __init__(self, time_length: int = 218):
         self.time_length = time_length
 
     def __call__(self, mfcc):
@@ -252,7 +277,7 @@ class DevTransform:
         Returns:
         --------
         torch.Tensor
-            Output tensor of shape (1, C, 40, 208), dtype=torch.float,
+            Output tensor of shape (1, C, 40, 218), dtype=torch.float,
             normalized (zero‐mean, unit‐variance).
         """
         # 1. Ensure torch.Tensor type
@@ -283,7 +308,7 @@ class DevTransform:
     
 # ------------- Train transformation wrapper -------------------------------------------
 
-def get_train_transform(time_length: int = 208,
+def get_train_transform(time_length: int = 218,
                         freq_mask_param: int = 15,
                         time_mask_param: int = 25):
     """
@@ -292,7 +317,7 @@ def get_train_transform(time_length: int = 208,
     Args:
     -----
     time_length : int
-        Fixed number of time‐frames after padding/truncation (default: 208).
+        Fixed number of time‐frames after padding/truncation (default: 218).
     freq_mask_param : int
         Maximum width of frequency‐axis mask (default: 15).
     time_mask_param : int
@@ -310,14 +335,14 @@ def get_train_transform(time_length: int = 208,
 
 # ------------- Dev transformation wrapper -------------------------------------------
 
-def get_dev_transform(time_length: int = 208):
+def get_dev_transform(time_length: int = 218):
     """
     Returns an instance of DevTransform with the specified time_length.
 
     Args:
     -----
     time_length : int
-        Fixed number of time‐frames after padding/truncation (default: 208).
+        Fixed number of time‐frames after padding/truncation (default: 218).
 
     Returns:
     --------
@@ -331,7 +356,7 @@ def get_dev_transform(time_length: int = 208):
     
 def create_dataloaders(
     batch_size: int,
-    time_length: int = 208,
+    time_length: int = 218,
     freq_mask_param: int = 15,
     time_mask_param: int = 25
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
