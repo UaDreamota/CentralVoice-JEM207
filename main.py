@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 from scripts.utils.data_downloader import download_data
-
+import zipfile
+import tarfile
 
 
 
@@ -30,14 +31,16 @@ def _run_script(script: str, *args: str) -> None:
     subprocess.run(cmd, check=True)
 
 
-def ensure_features(audio_dir: Path) -> None:
-    if any(p.suffix == ".npy" for p in audio_dir.iterdir()):
+def ensure_features(source_dir: Path) -> None:
+    PROCESSED_ROOT.mkdir(parents=True, exist_ok=True)
+
+    if any(p.suffix == ".npy" for p in PROCESSED_ROOT.iterdir()):
         print("Features already extracted. Skipping feature extraction.")
         return
 
     print("Extracting MFCC features…")
     script = str(REPO_ROOT / "scripts" / "utils" / "audio_features.py")
-    _run_script(script, str(audio_dir))
+    _run_script(script, str(source_dir), "--out", str(PROCESSED_ROOT))
 
 
 def ensure_labels(audio_dir: Path) -> None:
@@ -49,6 +52,21 @@ def ensure_labels(audio_dir: Path) -> None:
     script = str(REPO_ROOT / "scripts" / "utils" / "create_labels.py")
     _run_script(script, str(audio_dir))
 
+
+def extract_archives(directory: Path) -> None:
+    for archive in directory.rglob('*'):
+        if archive.suffix.lower() in {'.zip', '.tar', '.gz', '.tgz'}:
+            print(f"Extracting {archive}…")
+            try:
+                if archive.suffix.lower() == '.zip':
+                    with zipfile.ZipFile(archive, 'r') as zf:
+                        zf.extractall(archive.parent)
+                else:
+                    with tarfile.open(archive, 'r:*') as tf:
+                        tf.extractall(archive.parent)
+            except Exception as e:
+                print(f"Failed to extract {archive}: {e}")
+
 def main() -> None:
     if not DATA_AUDIO_DIR.exists() or not any(DATA_AUDIO_DIR.iterdir()):
         print("Wait! Data is missing.")
@@ -59,7 +77,8 @@ def main() -> None:
             ).strip().lower()
             if test_data_question == "test":
                 print("Creating 50 file batches. This may take a while...")
-                download_data(FOLDER_URL_TEST, UNPROCESSED_ROOT)
+                download_data(FOLDER_URL_TEST, str(UNPROCESSED_ROOT))
+                extract_archives(UNPROCESSED_ROOT)
             elif test_data_question == "full":
                 print("Creating 50 file batches. This may take a while...")
                 download_data(FOLDER_URL_DATA, UNPROCESSED_ROOT)
@@ -73,8 +92,8 @@ def main() -> None:
         print("ERROR: expected audio directory", DATA_AUDIO_DIR)
         return
 
-    ensure_features(PROCESSED_ROOT)
-    ensure_labels(DATA_AUDIO_DIR)
+    ensure_features(DATA_AUDIO_DIR)
+    ensure_labels(PROCESSED_ROOT)
 
 
 
