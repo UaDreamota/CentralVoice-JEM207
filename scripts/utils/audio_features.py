@@ -2,6 +2,10 @@ import argparse
 import os
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+UNPROCESSED_ROOT = REPO_ROOT / "data" / "unprocessed"
+PROCESSED_ROOT = REPO_ROOT / "data" / "processed"
+
 import librosa
 import numpy as np
 
@@ -63,7 +67,7 @@ def main() -> None:
         "-o",
         help=(
             "Output file (.npy) for a single input or directory to save multiple"
-            " files. Defaults to saving next to each audio clip."
+            " files. Defaults to saving to 'data/processed'."
         ),
     )
     args = parser.parse_args()
@@ -80,6 +84,11 @@ def main() -> None:
             os.makedirs(save_dir, exist_ok=True)
         else:
             single_out = args.out
+    elif len(paths) > 1 or os.path.isdir(args.audio_path):
+        # Mirror directory structure under data/processed
+        rel = Path(args.audio_path).resolve().relative_to(UNPROCESSED_ROOT)
+        save_dir = str((PROCESSED_ROOT / rel).resolve())
+        os.makedirs(save_dir, exist_ok=True)
 
     for audio_path in paths:
         wav, sr = load_audio(audio_path, sr=16000)
@@ -92,13 +101,15 @@ def main() -> None:
         elif single_out:
             np.save(single_out, feats)
             print(f"Saved MFCCs to {single_out} with shape {feats.shape}")
-        elif len(paths) > 1 or os.path.isdir(args.audio_path):
-            out_path = Path(audio_path).with_suffix(".npy")
+        else:
+            try:
+                rel = Path(audio_path).resolve().relative_to(UNPROCESSED_ROOT)
+                out_path = PROCESSED_ROOT / rel.with_suffix(".npy")
+                os.makedirs(out_path.parent, exist_ok=True)
+            except ValueError:
+                out_path = Path(audio_path).with_suffix(".npy")
             np.save(out_path, feats)
             print(f"Saved MFCCs to {out_path} with shape {feats.shape}")
-        else:
-            print(feats)
-            print("Shape:", feats.shape)
 
 
 if __name__ == "__main__":

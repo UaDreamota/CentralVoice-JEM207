@@ -4,6 +4,10 @@ import os
 import random
 from collections import defaultdict
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+UNPROCESSED_ROOT = REPO_ROOT / "data" / "unprocessed"
+PROCESSED_ROOT = REPO_ROOT / "data" / "processed"
 from typing import List, Tuple
 
 
@@ -98,7 +102,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = REPO_ROOT
     data_dir = Path(args.data_dir)
     if not data_dir.is_absolute():
         data_dir = repo_root / data_dir
@@ -107,7 +111,11 @@ def main() -> None:
     rows = []
     for audio in files:
         actor_id, sentence, emotion, level = parse_filename(os.path.basename(audio))
-        feature_path = Path(audio).with_suffix(".npy").resolve()
+        try:
+            rel = Path(audio).resolve().relative_to(UNPROCESSED_ROOT)
+            feature_path = (PROCESSED_ROOT / rel).with_suffix(".npy")
+        except ValueError:
+            feature_path = Path(audio).with_suffix(".npy").resolve()
         rel_path = feature_path.relative_to(repo_root)
         rows.append([str(rel_path), actor_id, sentence, emotion, level])
 
