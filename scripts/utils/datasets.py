@@ -124,8 +124,12 @@ class CremadPrecompDataset(Dataset):
 
         if self.split == "train" and self.train_transform:
             feats = self.train_transform(feats_np)
-        elif self.split in {"dev", "val"} and self.dev_transform:
+        elif self.split in {"dev", "val", "test"} and self.dev_transform:
             feats = self.dev_transform(feats_np)
+        else:
+            # No transform provided for this split; just convert to a tensor
+            # to keep the downstream code happy
+            feats = torch.tensor(feats_np, dtype=torch.float)
 
         if feats.ndim != 4:
             raise ValueError(
