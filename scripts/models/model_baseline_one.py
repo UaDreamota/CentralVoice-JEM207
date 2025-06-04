@@ -17,8 +17,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
 
-
-import torchmetrics
 from scripts.utils.datasets import create_dataloaders
 
 # ─────────────────────────────────────────────────────────────
@@ -69,8 +67,8 @@ class Conv_BN_GeLU(nn.Module):
 
     # ----------------- FORWARD PASS --------------------------
     def forward(self, x):
- 
-        return self.act(self.bn(self.conv(x)))
+        logits = self.act(self.bn(self.conv(x)))
+        return logits
 
 # ─────────────────────────────────────────────────────────────
 ###   2.  CONVOLUTIONAL BLOCK ATTENTION MODULE
@@ -374,7 +372,6 @@ def main(args: argparse.Namespace) -> None:
     # Generate test set predictions
     model.eval()
     test_predictions = []
-    test_filenames = []  # If your dataset provides filenames
 
     with torch.no_grad():
         for feats, _ in test_dl:  # Assuming no labels in test set

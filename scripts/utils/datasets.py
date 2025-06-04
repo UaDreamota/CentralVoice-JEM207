@@ -51,7 +51,7 @@ class CremadPrecompDataset(Dataset):
         root: str | Path,
         split: str,
         *,
-        meta_file: str = "meta.csv",
+        meta_file: str = "labels.csv",
         train_transform: Optional[callable] = None,
         dev_transform: Optional[callable] = None
     ) -> None:
