@@ -11,8 +11,14 @@ from typing import Optional, Tuple
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 from torchaudio.transforms import FrequencyMasking, TimeMasking
+
+# Repository root and dataset location
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CREMA_ROOT = REPO_ROOT / "data" / "processed"
 
 # ─────────────────────────────────────────────────────────────
 ### DATASET
@@ -274,6 +280,99 @@ class DevTransform:
         mfcc = (mfcc - mean) / (std + 1e-9)
 
         return mfcc
+    
+# ------------- Train transformation wrapper -------------------------------------------
+
+def get_train_transform(time_length: int = 208,
+                        freq_mask_param: int = 15,
+                        time_mask_param: int = 25):
+    """
+    Returns an instance of TrainTransform with the specified hyperparameters.
+
+    Args:
+    -----
+    time_length : int
+        Fixed number of time‐frames after padding/truncation (default: 208).
+    freq_mask_param : int
+        Maximum width of frequency‐axis mask (default: 15).
+    time_mask_param : int
+        Maximum width of time‐axis mask (default: 25).
+
+    Returns:
+    --------
+    TrainTransform
+    """
+    return TrainTransform(
+        time_length=time_length,
+        freq_mask_param=freq_mask_param,
+        time_mask_param=time_mask_param
+    )
+
+# ------------- Dev transformation wrapper -------------------------------------------
+
+def get_dev_transform(time_length: int = 208):
+    """
+    Returns an instance of DevTransform with the specified time_length.
+
+    Args:
+    -----
+    time_length : int
+        Fixed number of time‐frames after padding/truncation (default: 208).
+
+    Returns:
+    --------
+    DevTransform
+    """
+    return DevTransform(time_length=time_length)
+    
+# ─────────────────────────────────────────────────────────────
+### DATALOADERS
+# ─────────────────────────────────────────────────────────────
+    
+def create_dataloaders(
+    batch_size: int,
+    time_length: int = 208,
+    freq_mask_param: int = 15,
+    time_mask_param: int = 25
+) -> tuple[DataLoader, DataLoader, DataLoader]:
+    """
+    Create train, dev, and test dataloaders for CREMA-D using
+    CremadPrecompDataset. Pass the appropriate transforms into each.
+    """
+    # 1. Instantiate the transforms
+    train_transform = get_train_transform(
+        time_length=time_length,
+        freq_mask_param=freq_mask_param,
+        time_mask_param=time_mask_param
+    )
+    dev_transform = get_dev_transform(time_length=time_length)
+
+    # 2. Create dataset instances (notice the corrected class name)
+    train_ds = CremadPrecompDataset(
+        root=CREMA_ROOT,
+        split="train",
+        train_transform=train_transform,
+        dev_transform=None  # not used for train split
+    )
+    dev_ds = CremadPrecompDataset(
+        root=CREMA_ROOT,
+        split="dev",
+        train_transform=None,
+        dev_transform=dev_transform
+    )
+    test_ds = CremadPrecompDataset(
+        root=CREMA_ROOT,
+        split="test",
+        train_transform=None,
+        dev_transform=dev_transform
+    )
+
+    # 3. Wrap each in a DataLoader
+    train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=4)
+    dev_dl   = DataLoader(dev_ds, batch_size=batch_size, shuffle=False, num_workers=4)
+    test_dl  = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=4)
+
+    return train_dl, dev_dl, test_dl
 
 
 # ----------------------------------------------------------------- __main__
