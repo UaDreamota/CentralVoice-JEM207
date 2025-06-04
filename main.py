@@ -15,11 +15,14 @@ FOLDER_URL_DATA = (
 FOLDER_URL_TEST = (
     "https://drive.google.com/drive/folders/1-M4YQKUbNfAz-IZSGcSUguu7aqAa3AYf?usp=sharing"
 )
-OUTPUT_DIR = "data/unprocessed"
+
+
 
 REPO_ROOT = Path(__file__).resolve().parent
 DATA_AUDIO_DIR = REPO_ROOT / "data" / "unprocessed" / "crema-d" / "AudioWAV"
 LABEL_FILE = REPO_ROOT / "data" / "labels.csv"
+UNPROCESSED_ROOT = REPO_ROOT / "data" / "unprocessed"
+PROCESSED_ROOT = REPO_ROOT / "data" / "processed"
 
 
 def _run_script(script: str, *args: str) -> None:
@@ -56,10 +59,10 @@ def main() -> None:
             ).strip().lower()
             if test_data_question == "test":
                 print("Creating 50 file batches. This may take a while...")
-                download_data(FOLDER_URL_TEST, OUTPUT_DIR)
+                download_data(FOLDER_URL_TEST, UNPROCESSED_ROOT)
             elif test_data_question == "full":
                 print("Creating 50 file batches. This may take a while...")
-                download_data(FOLDER_URL_DATA, OUTPUT_DIR)
+                download_data(FOLDER_URL_DATA, UNPROCESSED_ROOT)
         else:
             print("You may now only run the inference script, as the data is missing.")
             return
@@ -70,7 +73,7 @@ def main() -> None:
         print("ERROR: expected audio directory", DATA_AUDIO_DIR)
         return
 
-    ensure_features(DATA_AUDIO_DIR)
+    ensure_features(PROCESSED_ROOT)
     ensure_labels(DATA_AUDIO_DIR)
 
 
