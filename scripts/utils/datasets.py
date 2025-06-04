@@ -1,18 +1,6 @@
-# utils/dataset.py
-"""Dataset utilities for the CREMA-D speech-sentiment project.
+# scripts/utils/dataset.py
+"""Dataset utility for the CREMA-D speech-sentiment project.
 
-A *single* public class is exported: :class:`CremadDataset`.
-It
-1. reads a CSV metadata file sitting next to an ``audio/`` directory,
-2. selects rows whose ``split`` column equals the argument (``train``/``dev``/``test``),
-3. loads each waveform with :pyfunc:`utils.audio_fearures.load_audio`,
-4. converts the signal to MFCCs via :pyfunc:`utils.audio_fearures.extract_mfcc` (or any feature function you inject),
-5. returns a **tuple** ``(features : torch.FloatTensor, label : int)`` directly usable by a PyTorch ``DataLoader``.
-
-The module also provides a small ``main`` for ad‑hoc inspection:
-
-```bash
-python -m utils.dataset --root data/cremad --split dev --index 42
 ```
 """
 
@@ -26,7 +14,7 @@ import torch
 from torch.utils.data import Dataset
 
 # Relative import from the same utils package
-from .audio_fearures import load_audio, extract_mfcc  # noqa: E402
+from .audio_features import load_audio, extract_mfcc  # noqa: E402
 
 
 class CremadDataset(Dataset):
@@ -35,9 +23,9 @@ class CremadDataset(Dataset):
     Parameters
     ----------
     root : str or Path
-        Directory containing *both* the metadata CSV and the ``audio/``
+        Directory containing *both* the metadata CSV and the "audio/"
         directory with WAV clips.
-    split : {"train", "dev", "val", "test"}
+    split : {"train", "dev", "test"}
         Partition to load. The string must exactly match the value in the
         ``split`` column of the CSV.
     meta_file : str, default "meta.csv"
