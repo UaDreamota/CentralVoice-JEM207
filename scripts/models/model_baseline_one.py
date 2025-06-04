@@ -28,7 +28,7 @@ parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
-parser.add_argument("--lr", default=0.01, type = float, help = "Learning rate.")
+parser.add_argument("--lr", default=0.02, type = float, help = "Learning rate.")
 parser.add_argument("--label_smoothing", default=0.05, type = float, help = "Label smoothing.")
 parser.add_argument("--red_rat", default=16, type = int, help="Reduction ratio for the MLP hidden layer size.")
 parser.add_argument("--drop1", default=0.2, type=float, help="Dropout rate in the 1st FC layer of the classification head.")
@@ -319,6 +319,7 @@ def main(args: argparse.Namespace) -> None:
         datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
         ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", k), v) for k, v in sorted(vars(args).items())))
     ))
+    os.makedirs(args.logdir, exist_ok=True)
 
     ### ----------- DataLoaders ---------------------
     train_dl, dev_dl, test_dl = create_dataloaders(args.batch_size)
@@ -405,8 +406,6 @@ def main(args: argparse.Namespace) -> None:
 ###  PREDICTION FILE
 # ─────────────────────────────────────────────────────────────
 
-    # Generate test set annotations, but in `args.logdir` to allow parallel execution.
-    os.makedirs(args.logdir, exist_ok=True)
 
 
 
