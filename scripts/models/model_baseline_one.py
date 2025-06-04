@@ -338,6 +338,8 @@ def main(args: argparse.Namespace) -> None:
         model.train()
         epoch_loss = 0.0
         batches = 0
+        train_correct = 0
+        train_total = 0
         for feats, label in train_dl:
             feats = feats.to(device)
             label = label.to(device)
@@ -349,8 +351,13 @@ def main(args: argparse.Namespace) -> None:
 
             epoch_loss += loss.item()
             batches += 1
+
+            pred_train = out.argmax(dim=1)
+            train_correct += (pred_train == label).sum().item()
+            train_total += label.size(0)
         
         train_losses.append(epoch_loss / batches)
+        train_acc = train_correct / train_total if train_total else 0
 
         # Quick dev accuracy
         model.eval()
@@ -364,7 +371,7 @@ def main(args: argparse.Namespace) -> None:
                 correct += (pred == label).sum().item()
                 total += label.size(0)
         acc = correct / total if total else 0
-        print(f"Epoch {epoch + 1}: train loss {train_losses[-1]:.4f}, dev accuracy {acc:.4f}")
+        print(f"Epoch {epoch + 1}: train loss {train_losses[-1]:.4f}, train accuracy {train_acc:.4f}, dev accuracy {acc:.4f}")
 
     torch.save(model.state_dict(), os.path.join(args.logdir, "model.pt"))
 
