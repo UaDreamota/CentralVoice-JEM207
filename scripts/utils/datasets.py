@@ -1,40 +1,39 @@
 # scripts/utils/dataset.py
-"""Dataset utility for the CREMA-D speech-sentiment project.
 
-```
+"""Dataset utility for the CREMA-D speech-sentiment project
+   *using *pre-computed* MFCC feature matrices stored as .npy files*.
 """
 
 import argparse
 import csv
 from pathlib import Path
-from typing import Callable, Optional, Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-# Relative import from the same utils package
-from .audio_features import load_audio, extract_mfcc  # noqa: E402
 
-
-class CremadDataset(Dataset):
-    """Return MFCC features and integer emotion labels from CREMA‑D.
+class CremadPrecompDataset(Dataset):
+    """Return **pre-computed** MFCC tensors and integer emotion labels.
 
     Parameters
     ----------
-    root : str or Path
-        Directory containing *both* the metadata CSV and the "audio/"
-        directory with WAV clips.
+    root : str | Path
+        Directory that contains the metadata CSV **plus** two sub-folders:
+
+        * ``audio/``   – the original WAV clips (optional, never touched here)
+        * ``mfcc/``    – one ``.npy`` file per clip, same basename as the WAV
+
     split : {"train", "dev", "test"}
-        Partition to load. The string must exactly match the value in the
-        ``split`` column of the CSV.
+        Partition to load (must match the ``split`` column in the CSV).
+
     meta_file : str, default "meta.csv"
         Filename of the metadata table.
-    feature_fn : Callable, optional
-        Custom function ``(signal : np.ndarray, sr : int) -> np.ndarray`` that
-        converts a mono waveform to any time‐frequency representation.
-        Defaults to 40‑coefficient MFCCs via
-        :pyfunc:`utils.audio_fearures.extract_mfcc`.
+
+    transform : callable, optional
+        Optional mapping ``np.ndarray -> np.ndarray`` that is *applied
+        **after** loading* (e.g. normalisation, padding, etc.).
     """
 
     def __init__(
@@ -43,14 +42,12 @@ class CremadDataset(Dataset):
         split: str,
         *,
         meta_file: str = "meta.csv",
-        feature_fn: Optional[Callable[[np.ndarray, int], np.ndarray]] = None,
+        transform: Optional[callable] = None,
     ) -> None:
         self.root = Path(root)
         self.split = split.lower()
         self.meta_file = meta_file
-        self.feature_fn = feature_fn or (
-            lambda sig, sr: extract_mfcc(sig, sr, n_mfcc=40)
-        )
+        self.transform = transform  # may be None
 
         meta_path = self.root / self.meta_file
         if not meta_path.exists():
@@ -62,60 +59,70 @@ class CremadDataset(Dataset):
             for row in reader:
                 if row.get("split", "").lower() != self.split:
                     continue
-                wav_file = self.root / "audio" / row["file"]
-                if not wav_file.exists():
-                    raise FileNotFoundError(f"Audio file '{wav_file}' not found.")
-                self.items.append((wav_file, int(row["emotion"])))
+
+                # ---------- expected file locations -------------------------
+                wav_file = self.root / "audio" / row["file"]          # not used
+                npy_file = self.root / "mfcc" / Path(row["file"]).with_suffix(".npy")
+                # ------------------------------------------------------------
+
+                if not npy_file.exists():
+                    raise FileNotFoundError(f"Feature file '{npy_file}' not found.")
+                self.items.append((npy_file, int(row["emotion"])))
 
         if not self.items:
             raise RuntimeError(
                 f"No samples for split '{self.split}' found in '{meta_path}'."
             )
 
-    # ------------------------------------------------------------------ Dataset
+    # ------------------------------------------------------------- Dataset API
     def __len__(self) -> int:
         return len(self.items)
 
     def __getitem__(self, idx: int):
-        wav_path, label = self.items[idx]
-        signal, sr = load_audio(str(wav_path), sr=16_000)  # ensures mono, 16 kHz
-        feats_np = self.feature_fn(signal, sr)
+        npy_path, label = self.items[idx]
+
+        feats_np: np.ndarray = np.load(npy_path)  # shape expected: (1, 1, C, T)
+
+        if self.transform is not None:
+            feats_np = self.transform(feats_np)
 
         if feats_np.ndim != 4:
             raise ValueError(
-                "feature_fn must return an array shaped (1, 1, C, T); "
-                f"got {feats_np.shape} instead."
+                "Each '.npy' must contain an array shaped (1, 1, C, T); "
+                f"got {feats_np.shape} from '{npy_path}'."
             )
 
         feats = torch.from_numpy(feats_np).float()
         return feats, label
 
-    # ----------------------------------------------------------- convenience API
+    # ------------------------------------------------------------- utilities
     def describe(self) -> str:
-        """"""
         return (
-            f"CremadDataset(root='{self.root}', split='{self.split}', "
+            f"CremadPrecompDataset(root='{self.root}', split='{self.split}', "
             f"size={len(self)})"
         )
 
 
+# ----------------------------------------------------------------- __main__
 
-# --------------------------------------------------------------------- __main__
-
-def _main() -> None:  # pragma: no cover
+def main() -> None:  # pragma: no cover
     parser = argparse.ArgumentParser(description="Quick dataset sanity check")
-    parser.add_argument("--root", required=True, help="Folder with audio/ and meta.csv")
-    parser.add_argument("--split", default="train", choices=["train", "dev", "test"],
+    parser.add_argument("--root", required=True,
+                        help="Folder with mfcc/, audio/ and meta.csv")
+    parser.add_argument("--split", default="train",
+                        choices=["train", "dev", "test"],
                         help="Dataset partition to inspect")
-    parser.add_argument("--index", type=int, default=0, help="Zero‑based sample index")
+    parser.add_argument("--index", type=int, default=0,
+                        help="Zero-based sample index")
     args = parser.parse_args()
 
-    dataset = CremadDataset(args.root, split=args.split)
+    dataset = CremadPrecompDataset(args.root, split=args.split)
     features, label = dataset[args.index]
     print(dataset.describe())
     print(
-        f"Sample {args.index}: features shape={tuple(features.shape)}, label={label}")
+        f"Sample {args.index}: features shape={tuple(features.shape)}, label={label}"
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover
-    _main()
+    main()
