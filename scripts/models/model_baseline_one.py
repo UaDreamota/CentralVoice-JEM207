@@ -23,24 +23,30 @@ import torchmetrics
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
-parser.add_argument("--modelnet", default=32, type=int, help="ModelNet dimension.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
-parser.add_argument("--lr", default=0.01, type = float, help = "Learning rate")
-parser.add_argument("--label_smoothing", default=0.05, type = float, help = "Label smoothing")
-parser.add_argument("--dropout_rate", default=0.2, type = float, help = "Dropout rate")
-parser.add_argument("--drop_connect_rate", default=0.2, type = float, help = "Dropout connection rate")
+parser.add_argument("--lr", default=0.01, type = float, help = "Learning rate.")
+parser.add_argument("--label_smoothing", default=0.05, type = float, help = "Label smoothing.")
+parser.add_argument("--red_ratio", default=16, type = int, help="Reduction ratio for the MLP hidden layer size.")
+parser.add_argument("--drop1", default=0.2, type=float, help="Dropout rate in the 1st FC layer of the classification head.")
+parser.add_argument("--drop2", default=0.2, type=float, help="Dropout rate in the 2nd FC layer of the classification head.")
 
 # ─────────────────────────────────────────────────────────────
 ### DATA AUGMENTATION
 # ─────────────────────────────────────────────────────────────
+
+class TrainTransform:
+    ...
+
+class TestTransform:
+    ...
 
 
 # ─────────────────────────────────────────────────────────────
 ### CREMA-D DATASET
 # ─────────────────────────────────────────────────────────────
 
-class ModelNetDatataset(torch.utils.data.Dataset):
+class CREMA_D_DATASET(torch.utils.data.Dataset):
     def __init__(self, dataset, train_transform=None, eval_transform=None):
         super().__init__(dataset=dataset)
 
@@ -61,7 +67,7 @@ class ModelNetDatataset(torch.utils.data.Dataset):
 # ─────────────────────────────────────────────────────────────
 ###   1. CONV → BN → GELU BLOCK
 # ─────────────────────────────────────────────────────────────
-class ConvBNGeLU(nn.Module):
+class Conv_BN_GeLU(nn.Module):
     """
     2-D convolution + batch normalisation + GELU activation.
     """
@@ -180,25 +186,25 @@ class FCNN(nn.Module):
         super().__init__()
 
         # (a) Shrink x-axis from 218 → 109
-        self.conv1 = ConvBNGeLU(1, 32,
+        self.conv1 = Conv_BN_GeLU(1, 32,
                                       k_size=(3,3),
                                       strd=(1,2),
                                       pad=(1,1))
 
         # (b) Two parallel 5×5 context CBs, stride (2,2)
-        self.conv2_1 = ConvBNGeLU(32, 32,
+        self.conv2_1 = Conv_BN_GeLU(32, 32,
                                   k_size=(5,5),
                                   strd=(2,2),
                                   pad=(0,1))           # → 18 × 53
 
-        self.conv_dil2_2 = ConvBNGeLU(32, 32,
+        self.conv_dil2_2 = Conv_BN_GeLU(32, 32,
                                   k_size=(5,5),
                                   strd=(2,2),
                                   pad=(2,3),            # careful: keeps H,W
                                   dilation=2)           #     18 × 53
 
         # (c) Fuse & halve x-axis again: 53 → 27
-        self.conv_fuse = ConvBNGeLU(64, 256,
+        self.conv_fuse = Conv_BN_GeLU(64, 256,
                                     k_size=(3,3),
                                     strd=(1,2),
                                     pad=(1,1))          # → 18 × 27
@@ -211,7 +217,7 @@ class FCNN(nn.Module):
         self.cbam = CBAM(channels=256)
 
         # (f) Conv 3×3 valid → 7 × 7  (keeps channels)
-        self.conv3 = ConvBNGeLU(256, 256,
+        self.conv3 = Conv_BN_GeLU(256, 256,
                                 k_size=(3,3),
                                 strd=(1,1),
                                 pad=(0,0))             # → 7 × 7
@@ -221,7 +227,7 @@ class FCNN(nn.Module):
                                  stride=1)              # → 6 × 6
 
         # (h) Conv 3×3 valid & channel squeeze: 256 → 128
-        self.conv4 = ConvBNGeLU(256, 128,
+        self.conv4 = Conv_BN_GeLU(256, 128,
                                 k_size=(3,3),
                                 strd=(1,1),
                                 pad=(0,0))             # → 4 × 4
@@ -232,7 +238,6 @@ class FCNN(nn.Module):
         self.relu1   = nn.ReLU(inplace=True)
         self.drop1   = nn.Dropout(p=0.4)
         self.fc2     = nn.Linear(256, 6)                # six emotion classes
-
 
 
     # ----------------- FORWARD PASS --------------------------
