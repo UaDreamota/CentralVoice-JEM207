@@ -18,21 +18,22 @@ import torch.nn.functional as F
 from typing import Tuple
 
 from scripts.utils.datasets import create_dataloaders
+from scripts.utils.logging import logging
 
 # ─────────────────────────────────────────────────────────────
 ### DYNAMIC ARGUMENTS
 # ─────────────────────────────────────────────────────────────
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
+parser.add_argument("--batch_size", default=24, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
-parser.add_argument("--lr", default=0.02, type = float, help = "Learning rate.")
+parser.add_argument("--lr", default=0.001, type = float, help = "Learning rate.")
 parser.add_argument("--label_smoothing", default=0.05, type = float, help = "Label smoothing.")
 parser.add_argument("--red_rat", default=16, type = int, help="Reduction ratio for the MLP hidden layer size.")
-parser.add_argument("--drop1", default=0.2, type=float, help="Dropout rate in the 1st FC layer of the classification head.")
-parser.add_argument("--drop2", default=0.2, type=float, help="Dropout rate in the 2nd FC layer of the classification head.")
+parser.add_argument("--drop1", default=0.3, type=float, help="Dropout rate in the 1st FC layer of the classification head.")
+parser.add_argument("--drop2", default=0.3, type=float, help="Dropout rate in the 2nd FC layer of the classification head.")
 
     
 ##### ───────────────────────────────────────────────────────────── FULLY CONVOLUTIONAL NETWORK WITH CBAM ─────────────────────────────────────────────────────────────
@@ -321,6 +322,8 @@ def main(args: argparse.Namespace) -> None:
     ))
     os.makedirs(args.logdir, exist_ok=True)
 
+    logging(args.logdir)
+
     ### ----------- DataLoaders ---------------------
     train_dl, dev_dl, test_dl = create_dataloaders(args.batch_size)
 
@@ -331,6 +334,9 @@ def main(args: argparse.Namespace) -> None:
     # Applying Xavier Initialization 
     model.apply(xavier_init)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=4
+    )
     loss_fn = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
 
     ### ----------- TRAINING LOOP ---------------------
@@ -356,22 +362,30 @@ def main(args: argparse.Namespace) -> None:
             pred_train = out.argmax(dim=1)
             train_correct += (pred_train == label).sum().item()
             train_total += label.size(0)
-        
+
         train_losses.append(epoch_loss / batches)
         train_acc = train_correct / train_total if train_total else 0
 
         # Quick dev accuracy
         model.eval()
         correct = 0
+        val_loss = 0.0
         total = 0
+        val_batches = 0
         with torch.no_grad():
             for feats, label in dev_dl:
                 feats = feats.to(device)
                 label = label.to(device)
-                pred = model(feats).argmax(dim=1)
+                outputs = model(feats)
+                pred = outputs.argmax(dim=1)
+                loss = loss_fn(outputs, label)
+                val_loss += loss.item()
                 correct += (pred == label).sum().item()
                 total += label.size(0)
+                val_batches += 1
         acc = correct / total if total else 0
+        avg_val_loss = val_loss / val_batches
+        scheduler.step(avg_val_loss)
         print(f"Epoch {epoch + 1}: train loss {train_losses[-1]:.4f}, train accuracy {train_acc:.4f}, dev accuracy {acc:.4f}")
 
     torch.save(model.state_dict(), os.path.join(args.logdir, "model.pt"))
