@@ -133,6 +133,14 @@ class CremadPrecompDataset(Dataset):
                 f"got {feats_np.shape} from '{npy_path}'."
             )
 
+        # Remove the dummy leading dimension so DataLoader yields
+        # tensors of shape (B, 1, 40, 218) instead of (B, 1, 1, 40, 218).
+        if feats.shape[0] != 1:
+            raise ValueError(
+                f"Expected leading dimension of size 1, got {feats.shape[0]} from '{npy_path}'."
+            )
+        feats = feats.squeeze(0)
+
         return feats, label
 
     # ------------------------------------------------------------- utilities
