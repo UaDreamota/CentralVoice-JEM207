@@ -5,6 +5,8 @@ from pathlib import Path
 import librosa
 import numpy as np
 
+REPO_ROOT = Path(__file__).resolve().parent
+PROCESSED_ROOT = REPO_ROOT / "data" / "processed"
 
 def load_audio(path: str, sr: int = 16000):
     """Load an audio file with the given sample rate."""
@@ -93,7 +95,7 @@ def main() -> None:
             np.save(single_out, feats)
             print(f"Saved MFCCs to {single_out} with shape {feats.shape}")
         elif len(paths) > 1 or os.path.isdir(args.audio_path):
-            processed_dir = Path("../../data/processed")
+            processed_dir = Path("/data/processed")
             processed_dir.mkdir(parents=True, exist_ok=True)
             out_path = processed_dir / f"{Path(audio_path).stem}.npy"
             np.save(out_path, feats)
