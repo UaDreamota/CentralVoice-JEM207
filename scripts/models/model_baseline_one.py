@@ -9,6 +9,7 @@ import datetime
 import os
 import re
 
+import random
 import numpy as np
 import torch
 import torch.nn as nn
@@ -16,6 +17,9 @@ import torch.nn.functional as F
 from typing import Tuple
 
 import torchmetrics
+from torchaudio.transforms import FrequencyMasking, TimeMasking
+
+from ..utils.datasets import CremadPrecompDataset, TrainTransform, DevTransform
 
 # ─────────────────────────────────────────────────────────────
 ### DYNAMIC ARGUMENTS
@@ -36,32 +40,50 @@ parser.add_argument("--drop2", default=0.2, type=float, help="Dropout rate in th
 ### DATA AUGMENTATION
 # ─────────────────────────────────────────────────────────────
 
-class TrainTransform:
-    ...
+# ------------- Train transformation wrapper -------------------------------------------
 
-class TestTransform:
-    ...
+def get_train_transform(time_length: int = 208,
+                        freq_mask_param: int = 15,
+                        time_mask_param: int = 25):
+    """
+    Returns an instance of TrainTransform with the specified hyperparameters.
 
+    Args:
+    -----
+    time_length : int
+        Fixed number of time‐frames after padding/truncation (default: 208).
+    freq_mask_param : int
+        Maximum width of frequency‐axis mask (default: 15).
+    time_mask_param : int
+        Maximum width of time‐axis mask (default: 25).
 
-# ─────────────────────────────────────────────────────────────
-### CREMA-D DATASET
-# ─────────────────────────────────────────────────────────────
+    Returns:
+    --------
+    TrainTransform
+    """
+    return TrainTransform(
+        time_length=time_length,
+        freq_mask_param=freq_mask_param,
+        time_mask_param=time_mask_param
+    )
 
-class CREMA_D_DATASET(torch.utils.data.Dataset):
-    def __init__(self, dataset, train_transform=None, eval_transform=None):
-        super().__init__(dataset=dataset)
+# ------------- Dev transformation wrapper -------------------------------------------
 
-        self.train_transform = train_transform
-        self.eval_transform = eval_transform
+def get_dev_transform(time_length: int = 208):
+    """
+    Returns an instance of DevTransform with the specified time_length.
 
-    def __len__(self):
-        return len(self.dataset)
+    Args:
+    -----
+    time_length : int
+        Fixed number of time‐frames after padding/truncation (default: 208).
 
-    def __getitem__(self, idx):
-        ...
-        
-        # Return simple tuple of tensors (this matches the TrainableModule expectations)
-        return 
+    Returns:
+    --------
+    DevTransform
+    """
+    return DevTransform(time_length=time_length)
+
     
 ##### ───────────────────────────────────────────────────────────── FULLY CONVOLUTIONAL NETWORK WITH CBAM ─────────────────────────────────────────────────────────────
 
@@ -183,7 +205,7 @@ class FCNN(nn.Module):
     Input:  (B, 1, 40, 218)      ── MFCC “image”
     Output: (B, 64, 9, 9)        ── compact feature map
     """
-    def __init__(self):
+    def __init__(self, dropout1 = 0.2, dropout2 = 0.2):
         super().__init__()
 
         # (a) Shrink x-axis from 218 → 109
@@ -237,7 +259,7 @@ class FCNN(nn.Module):
         self.flatten = nn.Flatten()                     # → 128·4·4 = 2048
         self.fc1     = nn.Linear(2048, 256, bias=True)
         self.relu1   = nn.ReLU(inplace=True)
-        self.drop1   = nn.Dropout(p=0.4)
+        self.drop1   = nn.Dropout(p=dropout1)
         self.fc2     = nn.Linear(256, 6)                # six emotion classes
 
 
@@ -262,12 +284,73 @@ class FCNN(nn.Module):
 
         x  = self.flatten(x)             # (B,2048)
         x  = self.drop1(self.relu1(self.fc1(x)))  # (B,256)
-        logits = self.fc2(x)             # (B,  6)
+        logits = self.drop1(self.relu1(self.fc2(x)))             # (B,  6)
 
         return logits
 
-###  ------------ ROUND FILTERS ------------------------------
+###  ------------ RANDOM SEED ------------------------------
+def set_torch_seed(seed: int, threads: int = 1):
+    """
+    Sets random seeds for Python, NumPy, and PyTorch to guarantee reproducibility.
+    Also forces PyTorch to use a fixed number of CPU threads (if needed).
 
+    Parameters:
+    -----------
+    seed : int
+        Seed for random generators.
+    threads : int
+        Number of CPU threads to use (optional).
+    """
+    # 1. Python built-in random
+    random.seed(seed)
+
+    # 2. NumPy
+    np.random.seed(seed)
+
+    # 3. PyTorch (CPU)
+    torch.manual_seed(seed)
+
+    # 4. PyTorch (CUDA, if available)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+
+    # 5. Make CuDNN deterministic (may slow down training)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    # 6. Set PyTorch threads (optional)
+    torch.set_num_threads(threads)
+    torch.set_num_interop_threads(threads)
+
+###  ------------  XAVIER (GLOROT) UNIFORM Initialization  ------------------------------
+def xavier_init(m):
+    """
+    Apply Xavier uniform initialization to weight parameters and
+    zero initialization to bias, for supported layer types.
+
+    Parameters:
+    -----------
+    m : nn.Module
+        A submodule of the model. If it is one of the supported types,
+        initialize its weight and bias accordingly.
+    """
+    # List of layer classes we want to initialize
+    types = (
+        nn.Linear,
+        nn.Conv2d
+    )
+    if isinstance(m, types):
+        # 1. Xavier uniform on weight
+        #    torch.nn.init.xavier_uniform_(tensor, gain=1.0)
+        #    - Origin: torch.nn.init (PyTorch core library)
+        #    - Argument `gain` is a scaling factor (default=1.0).
+        nn.init.xavier_uniform_(m.weight, gain=1.0)
+
+        # 2. Zeros on bias (if it exists)
+        if m.bias is not None:
+            # torch.nn.init.zeros_(tensor)
+            nn.init.zeros_(m.bias)
 
 
 #------------------------------------------------------------
@@ -276,8 +359,7 @@ class FCNN(nn.Module):
 
 def main(args: argparse.Namespace) -> None:
     # Set the random seed and the number of threads.
-    npfl138.startup(args.seed, args.threads)
-    npfl138.global_keras_initializers()
+    set_torch_seed(args.seed, args.threads)
 
     # Create logdir name.
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
@@ -287,27 +369,18 @@ def main(args: argparse.Namespace) -> None:
     ))
 
     
-    modelnet = ModelNet(args.modelnet)
+    train = CremadPrecompDataset(root=..., split = "train", meta_file="mela.csv", train_transform=get_train_transform).to(device=device)
 
     ### ----------- DataLoaders ---------------------
-    train = ModelNetDatataset(modelnet.train, train_transform=train_transform).dataloader(batch_size=args.batch_size, shuffle=True, pin_memory = True)
-
-    dev = ModelNetDatataset(modelnet.dev, eval_transform=eval_transform).dataloader(batch_size=args.batch_size, pin_memory = True)
-
-    test = ModelNetDatataset(modelnet.test, eval_transform=eval_transform).dataloader(batch_size=args.batch_size, pin_memory = True)
+    ...
 
     ### ----------- MODEL ---------------------
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create an EfficientNet-B0 (base model)
-    model = EfficientNet3D(
-        width_coefficient=1.0,
-        depth_coefficient=1.0,
-        dropout_rate=args.dropout_rate,
-        num_classes=modelnet.LABELS,
-        drop_connect_rate=args.drop_connect_rate 
-    ).to(device=device)
+    model = FCNN()
+    model.apply(xavier_init)
 
     ### ----------- MODEL training ---------------------
     optimizer = torch.optim.Adam(model.parameters(), lr = args.lr, weight_decay=1e-5)
@@ -322,22 +395,19 @@ def main(args: argparse.Namespace) -> None:
         scheduler=scheduler,
         loss=torch.nn.CrossEntropyLoss(label_smoothing=args.label_smoothing),
         metrics={
-            "accuracy": torchmetrics.Accuracy(task="multiclass", num_classes=modelnet.LABELS)
+            "accuracy": torchmetrics.Accuracy(task="multiclass", num_classes=6)
         },
         logdir=args.logdir
     )
 
     ## STORING BEST MODEL
-    callbacks = [
-        Checkpoint(monitor="dev_accuracy", mode="max")
-    ]
+
 
     ## .fit
-    model.fit(train, dev=dev, epochs=args.epochs, callbacks=callbacks)
+
 
     ### ----------- FINAL EVALUATION ---------------------
-    results = model.evaluate(dev)
-    print(f"Final validation performance: {results}")
+
 
 #------------------------------------------------------------
 ### GENERATING PREDICTION FILE
@@ -345,11 +415,7 @@ def main(args: argparse.Namespace) -> None:
 
     # Generate test set annotations, but in `args.logdir` to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
-    with open(os.path.join(args.logdir, "3d_recognition.txt"), "w", encoding="utf-8") as predictions_file:
-        # TODO: Perform the prediction on the test data. The line below assumes you have
-        # a dataloader `test` where the individual examples are `(grid, target)` pairs.
-        for prediction in model.predict(test, data_with_labels=True):
-            print(np.argmax(prediction), file=predictions_file)
+
 
 
 if __name__ == "__main__":
