@@ -95,8 +95,11 @@ def main() -> None:
     ensure_features(DATA_AUDIO_DIR)
     ensure_labels(PROCESSED_ROOT)
 
-
-
+    training_question = input("Do you wish to train the model? [y/n]: ").strip().lower()
+    if training_question == "y":
+        print("Training model...")
+    else:
+        print("Training model terminated.")
 
 if __name__ == "__main__":
     main()
