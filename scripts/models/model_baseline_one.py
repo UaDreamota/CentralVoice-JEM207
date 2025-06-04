@@ -1,4 +1,4 @@
-# scripts/models/dataset.py
+# scripts/models/model_baseline_one.py
 
 # ─────────────────────────────────────────────────────────────
 ### IMPORTS
@@ -9,6 +9,7 @@ import datetime
 import os
 import re
 
+import csv
 import random
 import numpy as np
 import torch
@@ -16,10 +17,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
 
+
 import torchmetrics
 from torchaudio.transforms import FrequencyMasking, TimeMasking
 
-from ..utils.datasets import CremadPrecompDataset, TrainTransform, DevTransform
+from ..utils.datasets import create_dataloaders
 
 # ─────────────────────────────────────────────────────────────
 ### DYNAMIC ARGUMENTS
@@ -32,57 +34,9 @@ parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 parser.add_argument("--lr", default=0.01, type = float, help = "Learning rate.")
 parser.add_argument("--label_smoothing", default=0.05, type = float, help = "Label smoothing.")
-parser.add_argument("--red_ratio", default=16, type = int, help="Reduction ratio for the MLP hidden layer size.")
+parser.add_argument("--red_rat", default=16, type = int, help="Reduction ratio for the MLP hidden layer size.")
 parser.add_argument("--drop1", default=0.2, type=float, help="Dropout rate in the 1st FC layer of the classification head.")
 parser.add_argument("--drop2", default=0.2, type=float, help="Dropout rate in the 2nd FC layer of the classification head.")
-
-# ─────────────────────────────────────────────────────────────
-### DATA AUGMENTATION
-# ─────────────────────────────────────────────────────────────
-
-# ------------- Train transformation wrapper -------------------------------------------
-
-def get_train_transform(time_length: int = 208,
-                        freq_mask_param: int = 15,
-                        time_mask_param: int = 25):
-    """
-    Returns an instance of TrainTransform with the specified hyperparameters.
-
-    Args:
-    -----
-    time_length : int
-        Fixed number of time‐frames after padding/truncation (default: 208).
-    freq_mask_param : int
-        Maximum width of frequency‐axis mask (default: 15).
-    time_mask_param : int
-        Maximum width of time‐axis mask (default: 25).
-
-    Returns:
-    --------
-    TrainTransform
-    """
-    return TrainTransform(
-        time_length=time_length,
-        freq_mask_param=freq_mask_param,
-        time_mask_param=time_mask_param
-    )
-
-# ------------- Dev transformation wrapper -------------------------------------------
-
-def get_dev_transform(time_length: int = 208):
-    """
-    Returns an instance of DevTransform with the specified time_length.
-
-    Args:
-    -----
-    time_length : int
-        Fixed number of time‐frames after padding/truncation (default: 208).
-
-    Returns:
-    --------
-    DevTransform
-    """
-    return DevTransform(time_length=time_length)
 
     
 ##### ───────────────────────────────────────────────────────────── FULLY CONVOLUTIONAL NETWORK WITH CBAM ─────────────────────────────────────────────────────────────
@@ -205,7 +159,7 @@ class FCNN(nn.Module):
     Input:  (B, 1, 40, 218)      ── MFCC “image”
     Output: (B, 64, 9, 9)        ── compact feature map
     """
-    def __init__(self, dropout1 = 0.2, dropout2 = 0.2):
+    def __init__(self, dropout1 = 0.2, dropout2 = 0.2, red_rat = 16):
         super().__init__()
 
         # (a) Shrink x-axis from 218 → 109
@@ -237,7 +191,7 @@ class FCNN(nn.Module):
                                 stride=(2,3))            # → 9 × 9
         
         # (e) CBAM attention (learned re-weighting)
-        self.cbam = CBAM(channels=256)
+        self.cbam = CBAM(channels=256, reduction_ratio=red_rat)
 
         # (f) Conv 3×3 valid → 7 × 7  (keeps channels)
         self.conv3 = Conv_BN_GeLU(256, 256,
@@ -260,20 +214,23 @@ class FCNN(nn.Module):
         self.fc1     = nn.Linear(2048, 256, bias=True)
         self.relu1   = nn.ReLU(inplace=True)
         self.drop1   = nn.Dropout(p=dropout1)
+        
         self.fc2     = nn.Linear(256, 6)                # six emotion classes
+        self.relu2   = nn.ReLU(inplace=True)
+        self.drop2   = nn.Dropout(p=dropout2)
 
 
     # ----------------- FORWARD PASS --------------------------
     def forward(self, x):
-        x  = self.conv_shrink(x)         # (B,32,40,109)
+        x  = self.conv1(x)         # (B,32,40,109)
 
         # context branches
-        a  = self.ctx_std(x)             # (B,32,18,53)
-        b  = self.ctx_dil(x)             # (B,32,18,53)
+        a  = self.conv2_1(x)             # (B,32,18,53)
+        b  = self.conv_dil2_2(x)             # (B,32,18,53)
         x  = torch.cat((a, b), dim=1)    # (B,64,18,53)
 
         x  = self.conv_fuse(x)           # (B,256,18,27)
-        x  = self.avg(x)                 # (B,256, 9, 9)
+        x  = self.avgp(x)                 # (B,256, 9, 9)
 
         x  = self.cbam(x)                # (B,256, 9, 9)
 
@@ -284,7 +241,7 @@ class FCNN(nn.Module):
 
         x  = self.flatten(x)             # (B,2048)
         x  = self.drop1(self.relu1(self.fc1(x)))  # (B,256)
-        logits = self.drop1(self.relu1(self.fc2(x)))             # (B,  6)
+        logits = self.drop2(self.relu2(self.fc2(x)))             # (B,  6)
 
         return logits
 
@@ -353,9 +310,9 @@ def xavier_init(m):
             nn.init.zeros_(m.bias)
 
 
-#------------------------------------------------------------
-### MAIN function
-#------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
+###  MAIN FUNCTION
+# ─────────────────────────────────────────────────────────────
 
 def main(args: argparse.Namespace) -> None:
     # Set the random seed and the number of threads.
@@ -368,50 +325,84 @@ def main(args: argparse.Namespace) -> None:
         ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", k), v) for k, v in sorted(vars(args).items())))
     ))
 
-    
-    train = CremadPrecompDataset(root=..., split = "train", meta_file="mela.csv", train_transform=get_train_transform).to(device=device)
-
     ### ----------- DataLoaders ---------------------
-    ...
+    train_dl, dev_dl, test_dl = create_dataloaders(args.batch_size)
 
     ### ----------- MODEL ---------------------
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = FCNN(dropout1=args.drop1, dropout2=args.drop2, red_rat=args.red_rat).to(device=device) # storing model on cuda
 
-    # Create an EfficientNet-B0 (base model)
-    model = FCNN()
+    # Applying Xavier Initialization 
     model.apply(xavier_init)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    loss_fn = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
 
-    ### ----------- MODEL training ---------------------
-    optimizer = torch.optim.Adam(model.parameters(), lr = args.lr, weight_decay=1e-5)
-    scheduler=torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer=optimizer,
-        T_max=args.epochs * len(train),
-        eta_min=args.lr * 0.1
-        )
-    ## CONFIGURATION OF THE MODEL
-    model.configure(
-        optimizer=optimizer,
-        scheduler=scheduler,
-        loss=torch.nn.CrossEntropyLoss(label_smoothing=args.label_smoothing),
-        metrics={
-            "accuracy": torchmetrics.Accuracy(task="multiclass", num_classes=6)
-        },
-        logdir=args.logdir
-    )
+    ### ----------- TRAINING LOOP ---------------------
+    train_losses = []
+    for epoch in range(args.epochs):
+        model.train()
+        epoch_loss = 0.0
+        batches = 0
+        for feats, label in train_dl:
+            feats = feats.to(device)
+            label = label.to(device)
+            optimizer.zero_grad()
+            out = model(feats)
+            loss = loss_fn(out, label)
+            loss.backward()
+            optimizer.step()
 
-    ## STORING BEST MODEL
+            epoch_loss += loss.item()
+            batches += 1
+        
+        train_losses.append(epoch_loss / batches)
 
+        # Quick dev accuracy
+        model.eval()
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for feats, label in dev_dl:
+                feats = feats.to(device)
+                label = label.to(device)
+                pred = model(feats).argmax(dim=1)
+                correct += (pred == label).sum().item()
+                total += label.size(0)
+        acc = correct / total if total else 0
+        print(f"Epoch {epoch + 1}: train loss {train_losses[-1]:.4f}, dev accuracy {acc:.4f}")
 
-    ## .fit
-
+    torch.save(model.state_dict(), os.path.join(args.logdir, "model.pt"))
 
     ### ----------- FINAL EVALUATION ---------------------
+    # Generate test set predictions
+    model.eval()
+    test_predictions = []
+    test_filenames = []  # If your dataset provides filenames
+
+    with torch.no_grad():
+        for feats, _ in test_dl:  # Assuming no labels in test set
+            feats = feats.to(device)
+            outputs = model(feats)
+            preds = outputs.argmax(dim=1).cpu().numpy()
+            test_predictions.extend(preds)
+            # If you have filenames: test_filenames.extend(batch_filenames)
+
+    # Save predictions to file
+
+    prediction_file = os.path.join(args.logdir, "predictions.csv")
+    with open(prediction_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['filename', 'prediction'])  # Header
+        for i, pred in enumerate(test_predictions):
+            # If you have filenames: writer.writerow([test_filenames[i], pred])
+            writer.writerow([f"sample_{i}", pred])
+
+    print(f"Predictions saved to {prediction_file}")
 
 
-#------------------------------------------------------------
-### GENERATING PREDICTION FILE
-#------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
+###  PREDICTION FILE
+# ─────────────────────────────────────────────────────────────
 
     # Generate test set annotations, but in `args.logdir` to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
