@@ -18,10 +18,10 @@ def main():
             test_data_question = input('Do you wish to download the full dataset or the test? [full/test]: ').strip().lower()
             if test_data_question == 'test':
                 print('Creating 50 file batches. This may take a while...')
-                download_data(folder_url_data, output_dir)
+                download_data(folder_url_test, output_dir)
             elif test_data_question == 'full':
                 print('Creating 50 file batches. This may take a while...')
-                download_data(folder_url_test, output_dir)
+                download_data(folder_url_data, output_dir)
         else:
             print('You may now only run the inference script, as the data is missing.')
             return
