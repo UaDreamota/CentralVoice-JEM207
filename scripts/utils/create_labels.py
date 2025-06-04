@@ -26,7 +26,7 @@ def parse_filename(filename: str) -> Tuple[str, str, str, str]:
 def collect_files(root: str) -> List[str]:
     paths = []
     for entry in os.scandir(root):
-        if entry.is_file() and entry.name.lower().endswith((".wav", ".mp3")):
+        if entry.is_file() and entry.name.lower().endswith((".wav", ".mp3", ".npy")):
             paths.append(entry.path)
     return sorted(paths)
 
@@ -87,7 +87,7 @@ def main() -> None:
     parser.add_argument(
         "data_dir",
         nargs="?",
-        default="data/unprocessed/crema-d/AudioWAV",
+        default="data/processed",
         help="Directory containing WAV or MP3 files",
     )
     parser.add_argument(
@@ -122,7 +122,7 @@ def main() -> None:
         writer.writerow(SPLIT_FIELDS)
         writer.writerows(rows)
 
-    meta_path = repo_root / "meta.csv"
+    meta_path = repo_root / "mela.csv"
     with open(meta_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(SPLIT_FIELDS)

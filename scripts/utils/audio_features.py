@@ -1,4 +1,3 @@
-# scripts/utils/audio_features.py
 import argparse
 import os
 from pathlib import Path
@@ -56,7 +55,7 @@ def main() -> None:
     parser.add_argument(
         "audio_path",
         nargs="?",
-        default="data/unprocessed/crema-d/AudioWAV",
+        default="../../data/unprocessed/crema-d/AudioWAV",
         help="Path to a WAV/MP3 file or a directory of audio files",
     )
     parser.add_argument(
@@ -64,7 +63,7 @@ def main() -> None:
         "-o",
         help=(
             "Output file (.npy) for a single input or directory to save multiple"
-            " files. Defaults to saving next to each audio clip."
+            " files. Defaults to saving into data/processed."
         ),
     )
     args = parser.parse_args()
@@ -94,7 +93,9 @@ def main() -> None:
             np.save(single_out, feats)
             print(f"Saved MFCCs to {single_out} with shape {feats.shape}")
         elif len(paths) > 1 or os.path.isdir(args.audio_path):
-            out_path = Path(audio_path).with_suffix(".npy")
+            processed_dir = Path("../../data/processed")
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            out_path = processed_dir / f"{Path(audio_path).stem}.npy"
             np.save(out_path, feats)
             print(f"Saved MFCCs to {out_path} with shape {feats.shape}")
         else:
