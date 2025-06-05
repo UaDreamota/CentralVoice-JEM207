@@ -52,6 +52,11 @@ def ensure_labels(audio_dir: Path) -> None:
     script = str(REPO_ROOT / "scripts" / "utils" / "create_labels.py")
     _run_script(script, str(audio_dir))
 
+def train_model() -> None:
+    print("Training model...")
+    script = str(REPO_ROOT / "scripts" / "models" /  "model_baseline.py")
+    _run_script(script)
+
 
 def extract_archives(directory: Path) -> None:
     for archive in directory.rglob('*'):
@@ -98,6 +103,7 @@ def main() -> None:
     training_question = input("Do you wish to train the model? [y/n]: ").strip().lower()
     if training_question == "y":
         print("Training model...")
+        train_model()
     else:
         print("Training model terminated.")
 
