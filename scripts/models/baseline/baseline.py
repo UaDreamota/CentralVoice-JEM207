@@ -1,6 +1,8 @@
 # scripts/models/no_cbam/baseline.py
 
-# Simplified CNN model for the CREMA-D dataset.
+# ─────────────────────────────────────────────────────────────
+### IMPORTS
+# ─────────────────────────────────────────────────────────────
 
 import argparse
 import datetime
@@ -8,6 +10,7 @@ import os
 import re
 import csv
 import random
+from typing import Tuple
 from pathlib import Path
 
 import numpy as np
@@ -18,9 +21,10 @@ from scripts.utils.datasets import create_dataloaders
 from scripts.utils.logging import logging
 from scripts.utils.eval_pred import evaluate_predictions  
 
-# ---------------------------------------------------------------------------
-# Argument parser
-# ---------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
+### DYNAMIC ARGUMENTS
+# ─────────────────────────────────────────────────────────────
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=24, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
@@ -29,34 +33,54 @@ parser.add_argument("--threads", default=1, type=int, help="Maximum number of th
 parser.add_argument("--lr", default=0.001, type=float, help="Learning rate.")
 parser.add_argument("--label_smoothing", default=0.05, type=float, help="Label smoothing.")
 
+##### ───────────────────────────────────────────────────────────── BASELINE CNN ─────────────────────────────────────────────────────────────
 
-# ---------------------------------------------------------------------------
-# Model definition
-# ---------------------------------------------------------------------------
+
 class SimpleCNN(nn.Module):
     """Minimal CNN: two conv blocks followed by global average pooling."""
 
-    def __init__(self) -> None:
+    def __init__(
+            self,
+            in_chan: int,
+            out_chan: int,
+            k_size: Tuple[int, int],
+            pad: Tuple[int, int],
+            drop: float
+            ) -> None:
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-        self.relu1 = nn.ReLU(inplace=True)
-        self.pool1 = nn.MaxPool2d(2, 2)
 
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_chan, out_chan, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(out_chan)
+        self.relu1 = nn.ReLU(inplace=True)
+
+        self.conv2 = nn.Conv2d(in_chan * 2, out_chan * 2, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(out_chan * 2)
         self.relu2 = nn.ReLU(inplace=True)
-        self.pool2 = nn.MaxPool2d(2, 2)
+
+        self.conv3 = nn.Conv2d(in_chan * 4, out_chan * 4, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(out_chan * 2)
+        self.relu3 = nn.ReLU(inplace=True)
 
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(64, 6)
+        self.fc = nn.Linear(out_chan * 4, out_chan * 4)
+        self.relu_fc = nn.ReLU(inplace=True)
+        self.drop = nn.Dropout(p=drop)
+
+        self.class_l = nn.Linear(out_chan * 4, 6)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: D401
         """Forward pass."""
-        x = self.pool1(self.relu1(self.conv1(x)))
-        x = self.pool2(self.relu2(self.conv2(x)))
+        x = self.relu1(self.bn1(self.conv1(x)))
+        x = self.relu2(self.bn2(self.conv2(x)))
+        x = self.relu3(self.bn3(self.conv3(x)))
+
         x = self.avgpool(x)
         x = self.flatten(x)
-        logits = self.fc(x)
+
+        x = self.drop(self.relu_fc(self.fc(x)))
+        logits = self.class_l(x)
+        
         return logits
 
 

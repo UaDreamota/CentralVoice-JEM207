@@ -137,8 +137,12 @@ class FCNN(nn.Module):
         self.relu1 = nn.ReLU(inplace=True)
         self.drop1 = nn.Dropout(p=dropout1)
 
-        self.fc2 = nn.Linear(256, 6)  # six emotion classes
+        self.fc2 = nn.Linear(256, 256, bias=True)
+        self.relu2 = nn.ReLU(inplace=True)
         self.drop2 = nn.Dropout(p=dropout2)
+
+
+        self.fc3 = nn.Linear(256, 6)  # six emotion classes
 
     # ----------------- FORWARD PASS --------------------------
     def forward(self, x):
@@ -152,6 +156,8 @@ class FCNN(nn.Module):
         x = self.conv_fuse(x)  # (B,256,18,27)
         x = self.avgp(x)  # (B,256, 9, 9)
 
+        x = self.cbam(x)  # (B,256, 9, 9)
+
         x = self.conv3(x)  # (B,256, 7, 7)
         x = self.maxp(x)  # (B,256, 6, 6)
 
@@ -159,7 +165,9 @@ class FCNN(nn.Module):
 
         x = self.flatten(x)  # (B,2048)
         x = self.drop1(self.relu1(self.fc1(x)))  # (B,256)
-        logits = self.drop2((self.fc2(x)))  # (B,  6)
+        x = self.drop2(self.relu2(self.fc2(x)))  # (B,256)
+
+        logits = self.fc3(x)
 
         return logits
 

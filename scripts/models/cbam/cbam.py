@@ -1,8 +1,6 @@
 # scripts/models/cbam/cbam.py
 
-# ─────────────────────────────────────────────────────────────
-### IMPORTS
-# ─────────────────────────────────────────────────────────────
+
 
 import argparse
 import datetime
@@ -21,7 +19,7 @@ import torch.nn.functional as F
 from scripts.utils.datasets import create_dataloaders
 from scripts.utils.logging import logging
 
-from scripts.utils.eval_pred import evaluate_predictions  # local module (eval_pred.py)
+from scripts.utils.eval_pred import evaluate_predictions  
 
 # ─────────────────────────────────────────────────────────────
 ### DYNAMIC ARGUMENTS
@@ -219,8 +217,12 @@ class FCNN(nn.Module):
         self.relu1 = nn.ReLU(inplace=True)
         self.drop1 = nn.Dropout(p=dropout1)
 
-        self.fc2 = nn.Linear(256, 6)  # six emotion classes
+        self.fc2 = nn.Linear(256, 256, bias=True)
+        self.relu2 = nn.ReLU(inplace=True)
         self.drop2 = nn.Dropout(p=dropout2)
+
+
+        self.fc3 = nn.Linear(256, 6)  # six emotion classes
 
     # ----------------- FORWARD PASS --------------------------
     def forward(self, x):
@@ -243,7 +245,9 @@ class FCNN(nn.Module):
 
         x = self.flatten(x)  # (B,2048)
         x = self.drop1(self.relu1(self.fc1(x)))  # (B,256)
-        logits = self.drop2((self.fc2(x)))  # (B,  6)
+        x = self.drop2(self.relu2(self.fc2(x)))  # (B,256)
+
+        logits = self.fc3(x)
 
         return logits
 
