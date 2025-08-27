@@ -1,4 +1,4 @@
-# scripts/models/model_baseline_one.py
+# scripts/models/cbam/cbam.py
 
 # ─────────────────────────────────────────────────────────────
 ### IMPORTS
@@ -11,6 +11,7 @@ import re
 import csv
 import random
 from typing import Tuple
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -361,6 +362,20 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901  pylint: disable=too-m
         )
 
     # 5) test‑predictions ---------------------------------------------------------------
+    ckpts = sorted(Path(args.logdir).glob("best_model_*.pt"))
+    if ckpts:
+        def _dev_acc(path: Path) -> float:
+            m = re.search(r"_d([0-9]*\.[0-9]+)\.pt$", path.name)
+            return float(m.group(1)) if m else -1.0
+
+        # Prefer highest dev acc; break ties by most recent mtime
+        best_ckpt = max(ckpts, key=lambda p: (_dev_acc(p), p.stat().st_mtime))
+        state = torch.load(best_ckpt, map_location=device)
+        model.load_state_dict(state)
+        print(f"Loaded best checkpoint: {best_ckpt}")
+    else:
+        print("No best_model_*.pt found – using last in-memory weights.")
+
     model.eval()
     test_preds = []
     with torch.no_grad():
