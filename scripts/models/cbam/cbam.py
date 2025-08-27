@@ -1,7 +1,6 @@
 # scripts/models/cbam/cbam.py
 
 
-
 import argparse
 import datetime
 import os
@@ -19,7 +18,7 @@ import torch.nn.functional as F
 from scripts.utils.datasets import create_dataloaders
 from scripts.utils.logging import logging
 
-from scripts.utils.eval_pred import evaluate_predictions  
+from scripts.utils.eval_pred import evaluate_predictions
 
 # ─────────────────────────────────────────────────────────────
 ### DYNAMIC ARGUMENTS
@@ -29,15 +28,35 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=24, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+parser.add_argument(
+    "--threads", default=1, type=int, help="Maximum number of threads to use."
+)
 parser.add_argument("--lr", default=0.001, type=float, help="Learning rate.")
-parser.add_argument("--label_smoothing", default=0.05, type=float, help="Label smoothing.")
-parser.add_argument("--red_rat", default=16, type=int, help="Reduction ratio for the MLP hidden layer size.")
-parser.add_argument("--drop1", default=0.4, type=float, help="Dropout rate in the 1st FC layer of the classification head.")
-parser.add_argument("--drop2", default=0.4, type=float, help="Dropout rate in the 2nd FC layer of the classification head.")
+parser.add_argument(
+    "--label_smoothing", default=0.05, type=float, help="Label smoothing."
+)
+parser.add_argument(
+    "--red_rat",
+    default=16,
+    type=int,
+    help="Reduction ratio for the MLP hidden layer size.",
+)
+parser.add_argument(
+    "--drop1",
+    default=0.4,
+    type=float,
+    help="Dropout rate in the 1st FC layer of the classification head.",
+)
+parser.add_argument(
+    "--drop2",
+    default=0.4,
+    type=float,
+    help="Dropout rate in the 2nd FC layer of the classification head.",
+)
 
 
 ##### ───────────────────────────────────────────────────────────── FULLY CONVOLUTIONAL NETWORK WITH CBAM ─────────────────────────────────────────────────────────────
+
 
 # ─────────────────────────────────────────────────────────────
 ###   1. CONV → BN → GELU BLOCK
@@ -48,23 +67,26 @@ class Conv_BN_GeLU(nn.Module):
     """
 
     def __init__(
-            self,
-            in_chan: int,
-            out_chan: int,
-            k_size: Tuple[int, int],
-            strd: Tuple[int, int] = (1, 1),
-            pad: Tuple[int, int] = (0, 0),
-            groups: int = 1,
-            dilation: int = 1
+        self,
+        in_chan: int,
+        out_chan: int,
+        k_size: Tuple[int, int],
+        strd: Tuple[int, int] = (1, 1),
+        pad: Tuple[int, int] = (0, 0),
+        groups: int = 1,
+        dilation: int = 1,
     ):
         super().__init__()
-        self.conv = nn.Conv2d(in_chan, out_chan,
-                              kernel_size=k_size,
-                              stride=strd,
-                              padding=pad,
-                              dilation=dilation,
-                              groups=groups,
-                              bias=False)
+        self.conv = nn.Conv2d(
+            in_chan,
+            out_chan,
+            kernel_size=k_size,
+            stride=strd,
+            padding=pad,
+            dilation=dilation,
+            groups=groups,
+            bias=False,
+        )
         self.bn = nn.BatchNorm2d(out_chan)
         self.act = nn.GELU()
 
@@ -77,6 +99,7 @@ class Conv_BN_GeLU(nn.Module):
 # ─────────────────────────────────────────────────────────────
 ###   2.  CONVOLUTIONAL BLOCK ATTENTION MODULE
 # ─────────────────────────────────────────────────────────────
+
 
 class CBAM(nn.Module):
     """
@@ -97,13 +120,16 @@ class CBAM(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(channels, hidden, bias=False),
             nn.ReLU(inplace=True),
-            nn.Linear(hidden, channels, bias=False)
+            nn.Linear(hidden, channels, bias=False),
         )
         # ── Spatial-attention sub-module ─────────────────────
-        self.conv_spat = nn.Conv2d(2, 1,  # 2 maps → 1
-                                   kernel_size=kernel_size,
-                                   padding=kernel_size // 2,
-                                   bias=False)
+        self.conv_spat = nn.Conv2d(
+            2,
+            1,  # 2 maps → 1
+            kernel_size=kernel_size,
+            padding=kernel_size // 2,
+            bias=False,
+        )
 
         self.sigmoid = nn.Sigmoid()
 
@@ -116,8 +142,12 @@ class CBAM(nn.Module):
         Channel attention summarizes feature-map activations across all spacial positions for each channel.
         """
         # global avg-pool  and  global max-pool over H×W
-        avg = F.adaptive_avg_pool2d(x, 1).squeeze(-1).squeeze(-1)  # (B, C, 1, 1) -> (B,C)
-        max = F.adaptive_max_pool2d(x, 1).squeeze(-1).squeeze(-1)  # (B, C, 1, 1) -> (B,C)
+        avg = (
+            F.adaptive_avg_pool2d(x, 1).squeeze(-1).squeeze(-1)
+        )  # (B, C, 1, 1) -> (B,C)
+        max = (
+            F.adaptive_max_pool2d(x, 1).squeeze(-1).squeeze(-1)
+        )  # (B, C, 1, 1) -> (B,C)
         return avg, max
 
     @staticmethod
@@ -155,6 +185,7 @@ class CBAM(nn.Module):
 ###   3. CNN WITH CBAM AND CLASSIFICATION HEAD
 # ─────────────────────────────────────────────────────────────
 
+
 class FCNN(nn.Module):
     """
     Input:  (B, 1, 40, 218)      ── MFCC “image”
@@ -165,51 +196,45 @@ class FCNN(nn.Module):
         super().__init__()
 
         # (a) Shrink x-axis from 218 → 109
-        self.conv1 = Conv_BN_GeLU(1, 32,
-                                  k_size=(3, 3),
-                                  strd=(1, 2),
-                                  pad=(1, 1))
+        self.conv1 = Conv_BN_GeLU(1, 32, k_size=(3, 3), strd=(1, 2), pad=(1, 1))
 
         # (b) Two parallel 5×5 context CBs, stride (2,2)
-        self.conv2_1 = Conv_BN_GeLU(32, 32,
-                                    k_size=(5, 5),
-                                    strd=(2, 2),
-                                    pad=(0, 1))  # → 18 × 53
+        self.conv2_1 = Conv_BN_GeLU(
+            32, 32, k_size=(5, 5), strd=(2, 2), pad=(0, 1)
+        )  # → 18 × 53
 
-        self.conv_dil2_2 = Conv_BN_GeLU(32, 32,
-                                        k_size=(5, 5),
-                                        strd=(2, 2),
-                                        pad=(2, 3),  # careful: keeps H,W
-                                        dilation=2)  # 18 × 53
+        self.conv_dil2_2 = Conv_BN_GeLU(
+            32,
+            32,
+            k_size=(5, 5),
+            strd=(2, 2),
+            pad=(2, 3),  # careful: keeps H,W
+            dilation=2,
+        )  # 18 × 53
 
         # (c) Fuse & halve x-axis again: 53 → 27
-        self.conv_fuse = Conv_BN_GeLU(64, 256,
-                                      k_size=(3, 3),
-                                      strd=(1, 2),
-                                      pad=(1, 1))  # → 18 × 27
+        self.conv_fuse = Conv_BN_GeLU(
+            64, 256, k_size=(3, 3), strd=(1, 2), pad=(1, 1)
+        )  # → 18 × 27
 
         # (d) 2×3 average pool to 9 × 9
-        self.avgp = nn.AvgPool2d(kernel_size=(2, 3),
-                                 stride=(2, 3))  # → 9 × 9
+        self.avgp = nn.AvgPool2d(kernel_size=(2, 3), stride=(2, 3))  # → 9 × 9
 
         # (e) CBAM attention (learned re-weighting)
         self.cbam = CBAM(channels=256, reduction_ratio=red_rat)
 
         # (f) Conv 3×3 valid → 7 × 7  (keeps channels)
-        self.conv3 = Conv_BN_GeLU(256, 256,
-                                  k_size=(3, 3),
-                                  strd=(1, 1),
-                                  pad=(0, 0))  # → 7 × 7
+        self.conv3 = Conv_BN_GeLU(
+            256, 256, k_size=(3, 3), strd=(1, 1), pad=(0, 0)
+        )  # → 7 × 7
 
         # (g) MaxPool 2×2, stride 1 → 6 × 6
-        self.maxp = nn.MaxPool2d(kernel_size=2,
-                                 stride=1)  # → 6 × 6
+        self.maxp = nn.MaxPool2d(kernel_size=2, stride=1)  # → 6 × 6
 
         # (h) Conv 3×3 valid & channel squeeze: 256 → 128
-        self.conv4 = Conv_BN_GeLU(256, 128,
-                                  k_size=(3, 3),
-                                  strd=(1, 1),
-                                  pad=(0, 0))  # → 4 × 4
+        self.conv4 = Conv_BN_GeLU(
+            256, 128, k_size=(3, 3), strd=(1, 1), pad=(0, 0)
+        )  # → 4 × 4
 
         # (i) Classifier head
         self.flatten = nn.Flatten()  # → 128·4·4 = 2048
@@ -220,7 +245,6 @@ class FCNN(nn.Module):
         self.fc2 = nn.Linear(256, 256, bias=True)
         self.relu2 = nn.ReLU(inplace=True)
         self.drop2 = nn.Dropout(p=dropout2)
-
 
         self.fc3 = nn.Linear(256, 6)  # six emotion classes
 
@@ -281,15 +305,25 @@ def xavier_init(m: nn.Module):
 # ─────────────────────────────────────────────────────────────
 
 
-def main(args: argparse.Namespace) -> None:  # noqa: C901  pylint: disable=too-many-locals,too-many-statements
+def main(
+    args: argparse.Namespace,
+) -> None:  # noqa: C901  pylint: disable=too-many-locals,too-many-statements
     # 1) reproducibility & logging‑folder ------------------------------------------------
     set_torch_seed(args.seed, args.threads)
 
-    args.logdir = os.path.join("logs", "{}-{}-{}".format(
-        os.path.basename(globals().get("__file__", "notebook")),
-        datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
-        ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", k), v) for k, v in sorted(vars(args).items())))
-    ))
+    args.logdir = os.path.join(
+        "logs",
+        "{}-{}-{}".format(
+            os.path.basename(globals().get("__file__", "notebook")),
+            datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
+            ",".join(
+                (
+                    "{}={}".format(re.sub("(.)[^_]*_?", r"\1", k), v)
+                    for k, v in sorted(vars(args).items())
+                )
+            ),
+        ),
+    )
     os.makedirs(args.logdir, exist_ok=True)
     logging(args.logdir)
 
@@ -298,11 +332,15 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901  pylint: disable=too-m
 
     # 3) model --------------------------------------------------------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = FCNN(dropout1=args.drop1, dropout2=args.drop2, red_rat=args.red_rat).to(device)
+    model = FCNN(dropout1=args.drop1, dropout2=args.drop2, red_rat=args.red_rat).to(
+        device
+    )
     model.apply(xavier_init)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs * len(train_dl), eta_min=args.lr * 0.01)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=args.epochs * len(train_dl), eta_min=args.lr * 0.01
+    )
     loss_fn = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
 
     # 4) training loop ------------------------------------------------------------------
@@ -349,7 +387,13 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901  pylint: disable=too-m
             best_dev_acc = dev_acc
             patience_counter = 0
             if epoch > 10:  # save only after some epochs
-                torch.save(model.state_dict(), os.path.join(args.logdir, f"best_model_t{train_acc:.4f}_d{best_dev_acc:.4f}.pt"))
+                torch.save(
+                    model.state_dict(),
+                    os.path.join(
+                        args.logdir,
+                        f"best_model_t{train_acc:.4f}_d{best_dev_acc:.4f}.pt",
+                    ),
+                )
         else:
             patience_counter += 1
             if patience_counter >= patience:
@@ -368,6 +412,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901  pylint: disable=too-m
     # 5) test‑predictions ---------------------------------------------------------------
     ckpts = sorted(Path(args.logdir).glob("best_model_*.pt"))
     if ckpts:
+
         def _dev_acc(path: Path) -> float:
             m = re.search(r"_d([0-9]*\.[0-9]+)\.pt$", path.name)
             return float(m.group(1)) if m else -1.0
@@ -400,7 +445,9 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901  pylint: disable=too-m
         overall_acc, per_class_acc = evaluate_predictions(args.logdir)
         print(f"Evaluation – overall accuracy: {overall_acc:.4f}")
         print(f"Evaluation – per‑class accuracy: {per_class_acc}")
-    except Exception as exc:  # broad, but we want to keep the run alive even if eval fails
+    except (
+        Exception
+    ) as exc:  # broad, but we want to keep the run alive even if eval fails
         print(f"Post‑run evaluation skipped – {exc}")
 
 
