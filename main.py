@@ -1,3 +1,8 @@
+# main.py
+
+# ─────────────────────────────────────────────────────────────
+### IMPORTS
+# ─────────────────────────────────────────────────────────────
 
 import os
 import subprocess
@@ -9,14 +14,8 @@ import zipfile
 import tarfile
 
 
-
-FOLDER_URL_DATA = (
-    "https://drive.google.com/drive/folders/1rWylF6dUeP2D8k39gMPGEUY4yBhyXGee?usp=sharing"
-)
-FOLDER_URL_TEST = (
-    "https://drive.google.com/drive/folders/1-M4YQKUbNfAz-IZSGcSUguu7aqAa3AYf?usp=sharing"
-)
-
+FOLDER_URL_DATA = "https://drive.google.com/drive/folders/1rWylF6dUeP2D8k39gMPGEUY4yBhyXGee?usp=sharing"
+FOLDER_URL_TEST = "https://drive.google.com/drive/folders/1-M4YQKUbNfAz-IZSGcSUguu7aqAa3AYf?usp=sharing"
 
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -52,34 +51,42 @@ def ensure_labels(audio_dir: Path) -> None:
     script = str(REPO_ROOT / "scripts" / "utils" / "create_labels.py")
     _run_script(script, str(audio_dir))
 
+
 def train_model() -> None:
     print("Training model...")
-    script = str(REPO_ROOT / "scripts" / "models" /  "model_baseline.py")
+    script = str(REPO_ROOT / "scripts" / "models" / "model_baseline.py")
     _run_script(script)
 
 
 def extract_archives(directory: Path) -> None:
-    for archive in directory.rglob('*'):
-        if archive.suffix.lower() in {'.zip', '.tar', '.gz', '.tgz'}:
+    for archive in directory.rglob("*"):
+        if archive.suffix.lower() in {".zip", ".tar", ".gz", ".tgz"}:
             print(f"Extracting {archive}…")
             try:
-                if archive.suffix.lower() == '.zip':
-                    with zipfile.ZipFile(archive, 'r') as zf:
+                if archive.suffix.lower() == ".zip":
+                    with zipfile.ZipFile(archive, "r") as zf:
                         zf.extractall(archive.parent)
                 else:
-                    with tarfile.open(archive, 'r:*') as tf:
+                    with tarfile.open(archive, "r:*") as tf:
                         tf.extractall(archive.parent)
             except Exception as e:
                 print(f"Failed to extract {archive}: {e}")
 
+
 def main() -> None:
     if not DATA_AUDIO_DIR.exists() or not any(DATA_AUDIO_DIR.iterdir()):
         print("Wait! Data is missing.")
-        download_question = input("Do you wish to download the data? [y/n]: ").strip().lower()
+        download_question = (
+            input("Do you wish to download the data? [y/n]: ").strip().lower()
+        )
         if download_question == "y":
-            test_data_question = input(
-                "Do you wish to download the full dataset or the test? [full/test]: "
-            ).strip().lower()
+            test_data_question = (
+                input(
+                    "Do you wish to download the full dataset or the test? [full/test]: "
+                )
+                .strip()
+                .lower()
+            )
             if test_data_question == "test":
                 print("Creating 50 file batches. This may take a while...")
                 download_data(FOLDER_URL_TEST, str(UNPROCESSED_ROOT))
@@ -106,6 +113,7 @@ def main() -> None:
         train_model()
     else:
         print("Training model terminated.")
+
 
 if __name__ == "__main__":
     main()

@@ -19,7 +19,7 @@ import torch.nn as nn
 
 from scripts.utils.datasets import create_dataloaders
 from scripts.utils.logging import logging
-from scripts.utils.eval_pred import evaluate_predictions  
+from scripts.utils.eval_pred import evaluate_predictions
 
 # ─────────────────────────────────────────────────────────────
 ### DYNAMIC ARGUMENTS
@@ -29,9 +29,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=24, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+parser.add_argument(
+    "--threads", default=1, type=int, help="Maximum number of threads to use."
+)
 parser.add_argument("--lr", default=0.001, type=float, help="Learning rate.")
-parser.add_argument("--label_smoothing", default=0.05, type=float, help="Label smoothing.")
+parser.add_argument(
+    "--label_smoothing", default=0.05, type=float, help="Label smoothing."
+)
 
 ##### ───────────────────────────────────────────────────────────── BASELINE CNN ─────────────────────────────────────────────────────────────
 
@@ -40,13 +44,13 @@ class SimpleCNN(nn.Module):
     """Minimal CNN: two conv blocks followed by global average pooling."""
 
     def __init__(
-            self,
-            in_chan: int,
-            out_chan: int,
-            k_size: Tuple[int, int],
-            pad: Tuple[int, int],
-            drop: float
-            ) -> None:
+        self,
+        in_chan: int,
+        out_chan: int,
+        k_size: Tuple[int, int],
+        pad: Tuple[int, int],
+        drop: float,
+    ) -> None:
         super().__init__()
 
         self.conv1 = nn.Conv2d(in_chan, out_chan, kernel_size=3, padding=1)
@@ -80,13 +84,14 @@ class SimpleCNN(nn.Module):
 
         x = self.drop(self.relu_fc(self.fc(x)))
         logits = self.class_l(x)
-        
+
         return logits
 
 
-# ---------------------------------------------------------------------------
-# Utility functions
-# ---------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
+###  Utility functions
+# ─────────────────────────────────────────────────────────────
+
 
 def set_torch_seed(seed: int, threads: int = 1) -> None:
     random.seed(seed)
@@ -107,9 +112,10 @@ def xavier_init(m: nn.Module) -> None:
             nn.init.zeros_(m.bias)
 
 
-# ---------------------------------------------------------------------------
-# Main training / evaluation routine
-# ---------------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
+###  MAIN FUNCTION
+# ─────────────────────────────────────────────────────────────
+
 
 def main(args: argparse.Namespace) -> None:  # noqa: C901
     # 1) reproducibility & logging‑folder -------------------------------------
@@ -122,9 +128,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
             datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
             ",".join(
                 (
-                    "{}={}".format(
-                        re.sub("(.)[^_]*_?", r"\1", k), v
-                    )
+                    "{}={}".format(re.sub("(.)[^_]*_?", r"\1", k), v)
                     for k, v in sorted(vars(args).items())
                 )
             ),
@@ -216,6 +220,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
     # 5) test predictions ---------------------------------------------------
     ckpts = sorted(Path(args.logdir).glob("best_model_*.pt"))
     if ckpts:
+
         def _dev_acc(path: Path) -> float:
             m = re.search(r"_d([0-9]*\.[0-9]+)\.pt$", path.name)
             return float(m.group(1)) if m else -1.0
@@ -242,7 +247,6 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
         for i, p in enumerate(test_preds):
             writer.writerow([f"sample_{i}", p])
     print(f"Predictions saved to {pred_file}")
-
 
     # 6) automatic evaluation ----------------------------------------------
     try:
