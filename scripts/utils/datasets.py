@@ -403,11 +403,13 @@ def create_dataloaders(
         train_transform=None,
         dev_transform=dev_transform
     )
-
+    num_workers = 4
+    pin_memory = False
+    persistent_workers = True if num_workers > 0 else False
     # 3. Wrap each in a DataLoader
-    train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=4)
-    dev_dl   = DataLoader(dev_ds, batch_size=batch_size, shuffle=False, num_workers=4)
-    test_dl  = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=4)
+    train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent_workers)
+    dev_dl   = DataLoader(dev_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent_workers)
+    test_dl  = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent_workers)
 
     return train_dl, dev_dl, test_dl
 

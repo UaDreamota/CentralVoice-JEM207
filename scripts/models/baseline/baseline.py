@@ -1,16 +1,14 @@
-# scripts/models/no_cbam/baseline.py
+# scripts/models/baseline/baseline.py
 
 # ─────────────────────────────────────────────────────────────
 ### IMPORTS
 # ─────────────────────────────────────────────────────────────
 
 import argparse
-import datetime
 import os
 import re
 import csv
 import random
-from typing import Tuple
 from pathlib import Path
 
 import numpy as np
@@ -27,7 +25,7 @@ from scripts.utils.eval_pred import evaluate_predictions
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=24, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=2, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument(
     "--threads", default=1, type=int, help="Maximum number of threads to use."
@@ -42,6 +40,36 @@ parser.add_argument(
     type=float,
     help="Dropout rate in the FC layer of the classification head.",
 )
+
+import sys, faulthandler, tracemalloc, atexit, threading, os
+
+# 1) Strong crash traces (incl. native)
+faulthandler.enable(all_threads=True)
+
+# 2) Trace Python allocations to show where offending objects were created
+tracemalloc.start(25)
+
+# 3) Print thread + object info at shutdown
+@atexit.register
+def _dump_threads():
+    print("\n[atexit] Threads alive at shutdown:", file=sys.stderr)
+    for t in threading.enumerate():
+        print("  -", t, file=sys.stderr)
+
+# 4) Replace unraisablehook to reveal the hidden exception’s details
+def _unraisablehook(unraisable):
+    print("\n=== Unraisable exception caught ===", file=sys.stderr)
+    print("exc:", repr(unraisable.exc_value), file=sys.stderr)
+    if unraisable.object is not None:
+        print("in object:", repr(unraisable.object), file=sys.stderr)
+    import traceback
+    traceback.print_exception(unraisable.exc_type, unraisable.exc_value, unraisable.exc_traceback)
+sys.unraisablehook = _unraisablehook
+
+# (Optional) Make CUDA kernel errors synchronous (helps if it’s a CUDA teardown issue)
+os.environ.setdefault("CUDA_LAUNCH_BLOCKING", "1")
+# (Optional) richer Torch C++ traces
+os.environ.setdefault("TORCH_SHOW_CPP_STACKTRACES", "1")
 
 ##### ───────────────────────────────────────────────────────────── BASELINE CNN ─────────────────────────────────────────────────────────────
 
@@ -125,9 +153,8 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
 
     args.logdir = os.path.join(
         "logs",
-        "{}-{}-{}".format(
+        "{}-{}".format(
             os.path.basename(globals().get("__file__", "notebook")),
-            datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
             ",".join(
                 (
                     "{}={}".format(re.sub("(.)[^_]*_?", r"\1", k), v)
@@ -144,6 +171,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
 
     # 3) model --------------------------------------------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print('Using device:', device)
     model = SimpleCNN(drop=args.drop).to(device)
     model.apply(xavier_init)
 
@@ -249,6 +277,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
         for i, p in enumerate(test_preds):
             writer.writerow([f"sample_{i}", p])
     print(f"Predictions saved to {pred_file}")
+
 
     # 6) automatic evaluation ----------------------------------------------
     try:

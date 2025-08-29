@@ -313,9 +313,8 @@ def main(
 
     args.logdir = os.path.join(
         "logs",
-        "{}-{}-{}".format(
+        "{}-{}".format(
             os.path.basename(globals().get("__file__", "notebook")),
-            datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
             ",".join(
                 (
                     "{}={}".format(re.sub("(.)[^_]*_?", r"\1", k), v)
