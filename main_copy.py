@@ -176,6 +176,12 @@ def train_model(model_script: Path) -> None:
             f"Training failed for {model_script.relative_to(REPO_ROOT)} "
             f"(exit code {e.returncode})"
         )
+        if e.stdout:
+            print("--- stdout ---")
+            print(e.stdout)
+        if e.stderr:
+            print("--- stderr ---")
+            print(e.stderr)
     
 
 
@@ -255,7 +261,7 @@ def main() -> None:
                 outdir,
                 label="emotion",        # change if your CSV uses another column name
                 split="split",          # change if your CSV uses another split column
-                title_prefix=f"Class distribution of emotions({LABEL_FILE.name})",
+                title_prefix=f"Class distribution of emotions",
             )
             saved = [str(p) for p in arts.values()]
             print("Saved class distribution plots:")
