@@ -36,6 +36,12 @@ parser.add_argument("--lr", default=0.001, type=float, help="Learning rate.")
 parser.add_argument(
     "--label_smoothing", default=0.05, type=float, help="Label smoothing."
 )
+parser.add_argument(
+    "--drop",
+    default=0.2,
+    type=float,
+    help="Dropout rate in the FC layer of the classification head.",
+)
 
 ##### ───────────────────────────────────────────────────────────── BASELINE CNN ─────────────────────────────────────────────────────────────
 
@@ -45,33 +51,29 @@ class SimpleCNN(nn.Module):
 
     def __init__(
         self,
-        in_chan: int,
-        out_chan: int,
-        k_size: Tuple[int, int],
-        pad: Tuple[int, int],
-        drop: float,
+        drop: float = 0.2
     ) -> None:
         super().__init__()
 
-        self.conv1 = nn.Conv2d(in_chan, out_chan, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(out_chan)
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1, stride=(1,2))
+        self.bn1 = nn.BatchNorm2d(32)
         self.relu1 = nn.ReLU(inplace=True)
 
-        self.conv2 = nn.Conv2d(in_chan * 2, out_chan * 2, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(out_chan * 2)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1, stride=(2,3))
+        self.bn2 = nn.BatchNorm2d(64)
         self.relu2 = nn.ReLU(inplace=True)
 
-        self.conv3 = nn.Conv2d(in_chan * 4, out_chan * 4, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(out_chan * 2)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1, stride=(2,2))
+        self.bn3 = nn.BatchNorm2d(128)
         self.relu3 = nn.ReLU(inplace=True)
 
         self.avgpool = nn.AdaptiveAvgPool2d(1)
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(out_chan * 4, out_chan * 4)
+        self.fc = nn.Linear(128, 256)
         self.relu_fc = nn.ReLU(inplace=True)
         self.drop = nn.Dropout(p=drop)
 
-        self.class_l = nn.Linear(out_chan * 4, 6)
+        self.class_l = nn.Linear(256, 6)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: D401
         """Forward pass."""
@@ -142,7 +144,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
 
     # 3) model --------------------------------------------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = SimpleCNN().to(device)
+    model = SimpleCNN(drop=args.drop).to(device)
     model.apply(xavier_init)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)

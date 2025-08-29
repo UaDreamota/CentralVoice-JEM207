@@ -40,13 +40,13 @@ parser.add_argument(
 )
 parser.add_argument(
     "--drop1",
-    default=0.4,
+    default=0.2,
     type=float,
     help="Dropout rate in the 1st FC layer of the classification head.",
 )
 parser.add_argument(
     "--drop2",
-    default=0.4,
+    default=0.2,
     type=float,
     help="Dropout rate in the 2nd FC layer of the classification head.",
 )
