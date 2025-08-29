@@ -169,7 +169,14 @@ def _parse_model_list(text: str) -> list[str]:
 
 def train_model(model_script: Path) -> None:
     print(f"Training model via: {model_script.relative_to(REPO_ROOT)}")
-    _run_script(str(model_script))
+    try:
+        _run_script(str(model_script))
+    except subprocess.CalledProcessError as e:
+        print(
+            f"Training failed for {model_script.relative_to(REPO_ROOT)} "
+            f"(exit code {e.returncode})"
+        )
+    
 
 
 # ─────────────────────────────────────────────────────────────
