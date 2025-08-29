@@ -169,8 +169,6 @@ class FCNN(nn.Module):
         x = self.conv_fuse(x)  # (B,256,18,27)
         x = self.avgp(x)  # (B,256, 9, 9)
 
-        x = self.cbam(x)  # (B,256, 9, 9)
-
         x = self.conv3(x)  # (B,256, 7, 7)
         x = self.maxp(x)  # (B,256, 6, 6)
 
@@ -240,7 +238,7 @@ def main(args: argparse.Namespace) -> None:
 
     # 3) model --------------------------------------------------------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = FCNN(dropout1=args.drop1, dropout2=args.drop2, red_rat=args.red_rat).to(
+    model = FCNN(dropout1=args.drop1, dropout2=args.drop2).to(
         device
     )
     model.apply(xavier_init)
