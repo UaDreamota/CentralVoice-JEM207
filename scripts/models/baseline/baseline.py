@@ -141,6 +141,20 @@ def xavier_init(m: nn.Module) -> None:
         if m.bias is not None:
             nn.init.zeros_(m.bias)
 
+def shutdown_dataloaders(*loaders) -> None:
+    """Gracefully terminate DataLoader workers.
+    PyTorch's DataLoader keeps worker threads alive when `persistent_workers`
+    is enabled.  Explicitly shutting them down avoids "threads alive at
+    shutdown" warnings and non‑zero exit codes.
+    """
+    for dl in loaders:
+        try:
+            iterator = getattr(dl, "_iterator", None)
+            if iterator is not None:
+                iterator._shutdown_workers()
+        except Exception:
+            pass
+
 
 # ─────────────────────────────────────────────────────────────
 ###  MAIN FUNCTION
@@ -286,6 +300,9 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
         print(f"Evaluation – per‑class accuracy: {per_class_acc}")
     except Exception as exc:  # keep the run alive even if eval fails
         print(f"Post‑run evaluation skipped – {exc}")
+    finally:
+        shutdown_dataloaders(train_dl, dev_dl, test_dl)
+        
 
 
 if __name__ == "__main__":
