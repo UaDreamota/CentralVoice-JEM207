@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List
 
 import torch
-from torchmetrics import Accuracy, ConfusionMatrix
+from torchmetrics import Accuracy, ConfusionMatrix, F1Score
 
 from scripts.utils.datasets import CremadPrecompDataset, CREMA_ROOT, get_dev_transform
 
@@ -54,8 +54,12 @@ def evaluate_predictions(log_dir: str) -> tuple[float, list[float]]:
     class_acc_metric = Accuracy(task="multiclass", num_classes=6, average="none")
     class_accuracy = class_acc_metric(preds_t, labels_t).tolist()
 
+    f1_metric = F1Score(task='multiclass', num_classes=6, average='macro')
+    f1_macro = f1_metric(preds_t, labels_t).item()
+
     cm_metric = ConfusionMatrix(task="multiclass", num_classes=6)
     confusion = cm_metric(preds_t, labels_t)
+
     print("Confusion matrix:\n", confusion)
     print(f"Accuracy: {accuracy:.4f}")
     print("Class accuracy:", class_accuracy)
