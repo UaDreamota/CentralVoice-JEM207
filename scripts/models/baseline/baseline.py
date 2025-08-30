@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
+from torchmetrics import F1Score
 
 from scripts.utils.datasets import create_dataloaders
 from scripts.utils.logging import logging
@@ -152,6 +153,7 @@ def shutdown_dataloaders(*loaders) -> None:
             iterator = getattr(dl, "_iterator", None)
             if iterator is not None:
                 iterator._shutdown_workers()
+                dl._iterator = None  # remove references so workers can exit
         except Exception:
             pass
 
@@ -194,6 +196,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
         optimizer, T_max=args.epochs * len(train_dl), eta_min=args.lr * 0.01
     )
     loss_fn = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
+    macro_f1 = F1Score(task='multiclass', num_classes=6, average='macro')
 
     # 4) training loop ------------------------------------------------------
     best_dev_acc = 0.0
@@ -201,12 +204,15 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
     for epoch in range(args.epochs):
         # Train phase -------------------------------------------------------
         model.train()
+
+        macro_f1.reset()
         epoch_loss, batches = 0.0, 0
         train_correct = train_total = 0
         for feats, label in train_dl:
             feats, label = feats.to(device), label.to(device)
             optimizer.zero_grad()
             out = model(feats)
+            pred = out.argmax(dim = 1)
             loss = loss_fn(out, label)
             loss.backward()
             optimizer.step()
@@ -214,25 +220,36 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
 
             epoch_loss += loss.item()
             batches += 1
-            train_correct += (out.argmax(dim=1) == label).sum().item()
+            train_correct += (pred == label).sum().item()
             train_total += label.size(0)
+            macro_f1.update(pred, label)
 
         train_acc = train_correct / train_total if train_total else 0.0
         train_loss_mean = epoch_loss / batches
+        train_f1 = float(macro_f1.compute().item())
 
         # Dev phase ---------------------------------------------------------
         model.eval()
+
+        macro_f1.reset()
         correct = total = val_batches = 0
         val_loss = 0.0
         with torch.no_grad():
             for feats, label in dev_dl:
                 feats, label = feats.to(device), label.to(device)
                 outputs = model(feats)
+                prediction = outputs.argmax(dim = 1) 
+
                 val_loss += loss_fn(outputs, label).item()
-                correct += (outputs.argmax(dim=1) == label).sum().item()
-                total += label.size(0)
                 val_batches += 1
+                correct += (prediction == label).sum().item()
+                total += label.size(0)
+                macro_f1.update(prediction, label)
+                
+                
         dev_acc = correct / total if total else 0.0
+        val_loss_mean = val_loss / val_batches
+        dev_f1 = float(macro_f1.compute().item())
 
         # Checkpoint / early stopping --------------------------------------
         if dev_acc > best_dev_acc + 1e-4:
@@ -257,8 +274,8 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
 
         current_lr = optimizer.param_groups[0]["lr"]
         print(
-            f"Epoch {epoch + 1}: train_loss {train_loss_mean:.4f}, train_acc {train_acc:.4f}, "
-            f"dev_acc {dev_acc:.4f}, lr {current_lr:.6f}"
+            f"Epoch {epoch + 1}: \n train_loss {train_loss_mean:.4f}, train_acc {train_acc:.4f}, train_f1 {train_f1:.4f} \n"
+            f"dev_loss {val_loss_mean:.4f}, dev_acc {dev_acc:.4f}, dev_f1 {dev_f1:.4f}, lr {current_lr:.6f}"
         )
 
     # 5) test predictions ---------------------------------------------------
