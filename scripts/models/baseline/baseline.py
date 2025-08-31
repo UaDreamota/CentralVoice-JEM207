@@ -196,7 +196,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
         optimizer, T_max=args.epochs * len(train_dl), eta_min=args.lr * 0.01
     )
     loss_fn = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
-    macro_f1 = F1Score(task='multiclass', num_classes=6, average='macro')
+    macro_f1 = F1Score(task='multiclass', num_classes=6, average='macro').to(device)
 
     # 4) training loop ------------------------------------------------------
     best_dev_acc = 0.0
@@ -313,8 +313,6 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
     # 6) automatic evaluation ----------------------------------------------
     try:
         overall_acc, per_class_acc = evaluate_predictions(args.logdir)
-        print(f"Evaluation – overall accuracy: {overall_acc:.4f}")
-        print(f"Evaluation – per‑class accuracy: {per_class_acc}")
     except Exception as exc:  # keep the run alive even if eval fails
         print(f"Post‑run evaluation skipped – {exc}")
     finally:
