@@ -18,7 +18,8 @@ import torch.nn as nn
 from torchmetrics import F1Score
 
 from scripts.utils.datasets import create_dataloaders
-from scripts.utils.logging import logging, CSVHistoryLogger
+
+from scripts.utils.logging import setup_logging, CSVHistoryLogger
 from scripts.utils.eval_pred import evaluate_predictions
 
 # ─────────────────────────────────────────────────────────────
@@ -43,35 +44,6 @@ parser.add_argument(
     help="Dropout rate in the FC layer of the classification head.",
 )
 
-import sys, faulthandler, tracemalloc, atexit, threading, os
-
-# 1) Strong crash traces (incl. native)
-faulthandler.enable(all_threads=True)
-
-# 2) Trace Python allocations to show where offending objects were created
-tracemalloc.start(25)
-
-# 3) Print thread + object info at shutdown
-@atexit.register
-def _dump_threads():
-    print("\n[atexit] Threads alive at shutdown:", file=sys.stderr)
-    for t in threading.enumerate():
-        print("  -", t, file=sys.stderr)
-
-# 4) Replace unraisablehook to reveal the hidden exception’s details
-def _unraisablehook(unraisable):
-    print("\n=== Unraisable exception caught ===", file=sys.stderr)
-    print("exc:", repr(unraisable.exc_value), file=sys.stderr)
-    if unraisable.object is not None:
-        print("in object:", repr(unraisable.object), file=sys.stderr)
-    import traceback
-    traceback.print_exception(unraisable.exc_type, unraisable.exc_value, unraisable.exc_traceback)
-sys.unraisablehook = _unraisablehook
-
-# (Optional) Make CUDA kernel errors synchronous (helps if it’s a CUDA teardown issue)
-os.environ.setdefault("CUDA_LAUNCH_BLOCKING", "1")
-# (Optional) richer Torch C++ traces
-os.environ.setdefault("TORCH_SHOW_CPP_STACKTRACES", "1")
 
 ##### ───────────────────────────────────────────────────────────── BASELINE CNN ─────────────────────────────────────────────────────────────
 
@@ -181,7 +153,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
         ),
     )
     os.makedirs(args.logdir, exist_ok=True)
-    logging(args.logdir)
+    setup_logging(args.logdir)
 
     # 2) data ---------------------------------------------------------------
     train_dl, dev_dl, test_dl = create_dataloaders(args.batch_size)

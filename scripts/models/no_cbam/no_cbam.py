@@ -19,7 +19,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from scripts.utils.datasets import create_dataloaders
-from scripts.utils.logging import logging
+from scripts.utils.logging import setup_logging
 
 from scripts.utils.eval_pred import evaluate_predictions  # local module (eval_pred.py)
 
@@ -29,7 +29,7 @@ from scripts.utils.eval_pred import evaluate_predictions  # local module (eval_p
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=24, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=1, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument(
     "--threads", default=1, type=int, help="Maximum number of threads to use."
@@ -230,7 +230,7 @@ def main(args: argparse.Namespace) -> None:
         ),
     )
     os.makedirs(args.logdir, exist_ok=True)
-    logging(args.logdir)
+    setup_logging(args.logdir)
 
     # 2) data ---------------------------------------------------------------------------
     train_dl, dev_dl, test_dl = create_dataloaders(args.batch_size)

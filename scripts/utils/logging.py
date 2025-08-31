@@ -1,49 +1,52 @@
 # utils/logging.py
-import os, sys, datetime, atexit
 from __future__ import annotations
+import os, sys, datetime, atexit
+
 from pathlib import Path
 import csv, json
 from typing import Dict, Any, Optional
 
 
-def logging(logdir: str, filename: str = "train.log") -> None:
-    """
-    Redirect stdout *and* stderr so that everything printed during training
-    is also saved in `logdir/filename`.
+class _Tee:
+    def __init__(self, *streams):
+        self._streams = streams
+    def write(self, data):
+        for s in self._streams:
+            try:
+                s.write(data)
+            except Exception:
+                pass
+        self.flush()
+    def flush(self):
+        for s in self._streams:
+            try:
+                s.flush()
+            except Exception:
+                pass
 
-    Parameters
-    ----------
-    logdir : str
-        Path to the run-specific folder (already made with os.makedirs).
-    filename : str, default "train.log"
-        Name of the text file that will hold the console output.
-    """
+def setup_logging(logdir: str, filename: str = "train.log") -> None:
     os.makedirs(logdir, exist_ok=True)
     log_path = os.path.join(logdir, filename)
 
-    # -- minimal "tee" implementation -----------------------------------------
-    class _Tee:
-        def __init__(self, *streams):
-            self._streams = streams
-        def write(self, data):
-            for s in self._streams:
-                s.write(data)
-                s.flush()
-        def flush(self):
-            for s in self._streams:
-                s.flush()
+    # line-buffered so prints appear promptly
+    fh = open(log_path, "w", encoding="utf-8", buffering=1)
+    orig_out, orig_err = sys.stdout, sys.stderr
 
-    # open the file in **text** mode and redirect the std-streams
-    _file_handle = open(log_path, "w", encoding="utf-8")
-    sys.stdout = _Tee(sys.__stdout__, _file_handle)   # keep live console echo
-    sys.stderr = _Tee(sys.__stderr__, _file_handle)
+    tee = _Tee(sys.__stdout__ or orig_out, fh)
+    sys.stdout = tee
+    sys.stderr = tee
 
-    # make sure the file is closed when the program ends
-    atexit.register(_file_handle.close)
+    def _cleanup():
+        # restore first, so late prints go only to console (not a closed file)
+        sys.stdout = orig_out
+        sys.stderr = orig_err
+        try: fh.flush()
+        except Exception: pass
+        try: fh.close()
+        except Exception: pass
 
-    # first line so you see it both on screen and in the file
+    atexit.register(_cleanup)
     print(f"# Logging to {log_path}   ({datetime.datetime.now().isoformat(timespec='seconds')})")
-
 
 class CSVHistoryLogger:
     """
@@ -78,3 +81,4 @@ class CSVHistoryLogger:
             "early_stop_epoch": (None if early_stop_epoch is None else int(early_stop_epoch)),
         }
         (self.logdir / "metrics.json").write_text(json.dumps(summary, indent=2))
+
