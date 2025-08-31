@@ -10,6 +10,7 @@ import re
 import csv
 import random
 from pathlib import Path
+from time import time
 
 import numpy as np
 import torch
@@ -17,7 +18,7 @@ import torch.nn as nn
 from torchmetrics import F1Score
 
 from scripts.utils.datasets import create_dataloaders
-from scripts.utils.logging import logging
+from scripts.utils.logging import logging, CSVHistoryLogger
 from scripts.utils.eval_pred import evaluate_predictions
 
 # ─────────────────────────────────────────────────────────────
@@ -197,11 +198,14 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
     )
     loss_fn = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
     macro_f1 = F1Score(task='multiclass', num_classes=6, average='macro').to(device)
+    logger = CSVHistoryLogger(args.logdir)
 
     # 4) training loop ------------------------------------------------------
     best_dev_acc = 0.0
     patience_counter, patience = 0, 5
     for epoch in range(args.epochs):
+
+        t0 = time()
         # Train phase -------------------------------------------------------
         model.train()
 
@@ -251,6 +255,8 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
         val_loss_mean = val_loss / val_batches
         dev_f1 = float(macro_f1.compute().item())
 
+        wall = time() - t0
+
         # Checkpoint / early stopping --------------------------------------
         if dev_acc > best_dev_acc + 1e-4:
             best_dev_acc = dev_acc
@@ -277,6 +283,11 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
             f"Epoch {epoch + 1}: \n train_loss {train_loss_mean:.4f}, train_acc {train_acc:.4f}, train_f1 {train_f1:.4f} \n"
             f"dev_loss {val_loss_mean:.4f}, dev_acc {dev_acc:.4f}, dev_f1 {dev_f1:.4f}, lr {current_lr:.6f}"
         )
+
+        logger.log(epoch=epoch, split="train",
+                    loss=train_loss_mean, acc=train_acc, macro_f1=train_f1, lr=current_lr, wall_time=wall)
+        logger.log(epoch=epoch, split="dev",
+                    loss=val_loss_mean, acc=dev_acc, macro_f1=dev_f1, lr=current_lr, wall_time=wall)
 
     # 5) test predictions ---------------------------------------------------
     ckpts = sorted(Path(args.logdir).glob("best_model_*.pt"))
