@@ -25,7 +25,7 @@ DATA_AUDIO_DIR = REPO_ROOT / "data" / "unprocessed" / "crema-d" / "AudioWAV"
 LABEL_FILE = REPO_ROOT / "data" / "labels.csv"
 UNPROCESSED_ROOT = REPO_ROOT / "data" / "unprocessed"
 PROCESSED_ROOT = REPO_ROOT / "data" / "processed"
-SCOPE_MARKER = UNPROCESSED_ROOT / "crema-d" / ".download_scope"  # <-- NEW
+SCOPE_MARKER = UNPROCESSED_ROOT / "crema-d" / ".download_scope"  
 
 
 # ─────────────────────────────────────────────────────────────
@@ -50,8 +50,8 @@ def _run_script(script: str, *args: str) -> None:
 
     Notes
     -----
-    This function uses `sys.executable` to ensure the same interpreter and
-    environment as the current process.
+    - Uses `sys.executable` to ensure the same interpreter/environment.
+    - Stdout/stderr are not captured; they stream directly to this process.
     """
     cmd = [sys.executable, script, *args]
     subprocess.run(cmd, check=True)
@@ -133,14 +133,9 @@ def extract_archives(directory: Path) -> None:
 
     Notes
     -----
-    Supports ``.zip``, ``.tar``, ``.gz`` and ``.tgz``. Archives are extracted
-    in-place to their parent directory. Errors are caught and logged.
-
-    Security
-    --------
-    Be cautious with untrusted archives; this uses standard libraries
-    (`zipfile`, `tarfile`) which do not protect against path traversal in
-    malicious archives.
+    - Supported: `.zip` and tarballs (`.tar`, `.tar.gz`, `.tgz`).
+    - Archives are extracted in-place to their parent directory. Errors are
+      caught and logged.
     """
     for archive in directory.rglob("*"):
         if archive.suffix.lower() in {".zip", ".tar", ".gz", ".tgz"}:
@@ -491,6 +486,32 @@ def main() -> None:
             print('Training logs are not visualized.')
     else:
         print("Training model terminated.")
+        view_existing = input("Do you want to view existing training log visualizations? [y/n]: ").strip().lower()
+        if view_existing == "y":
+            model_choice = input("Which model reports do you want to view? [CNN+CBAM, CNN, baseline]: ").strip().lower()
+            models_to_view = _parse_model_list(model_choice)
+
+            for m in models_to_view:
+                png_paths: list[Path] = []
+                # Check both possible locations
+                for d in [
+                    REPO_ROOT / "reports" / m,
+                    REPO_ROOT / "reports" / "training_logs" / m,
+                ]:
+                    if d.exists():
+                        png_paths.extend(sorted(d.glob("*.png")))
+
+                if png_paths:
+                    print(f"Found {len(png_paths)} PNG(s) for '{m}':")
+                    for p in png_paths:
+                        print(" -", p)
+                        try:
+                            os.startfile(p)  # Windows: open with default viewer
+                        except Exception as exc:
+                            print(f"   Could not open {p}: {exc}")
+                else:
+                    print(f"No report images found for '{m}'. Please train the model first.")
+#
 
 
 if __name__ == "__main__":
