@@ -10,7 +10,8 @@ import sys
 from pathlib import Path
 
 from scripts.utils.data_downloader import download_data
-from scripts.utils.visualizations import plot_class_distribution 
+from scripts.utils.eval_pred import evaluate_predictions
+from scripts.utils.visualizations import plot_class_distribution, plot_training_history, plot_confusion_matrix
 import zipfile
 import tarfile
 
@@ -32,19 +33,63 @@ SCOPE_MARKER = UNPROCESSED_ROOT / "crema-d" / ".download_scope"  # <-- NEW
 # ─────────────────────────────────────────────────────────────
 
 def _run_script(script: str, *args: str) -> None:
+    """
+    Run a Python script in a subprocess using the current interpreter.
+
+    Parameters
+    ----------
+    script : str
+        Absolute or repository-relative path to a Python script file.
+    *args : str
+        Additional command-line arguments passed to the script.
+
+    Raises
+    ------
+    subprocess.CalledProcessError
+        If the invoked script exits with a non-zero status.
+
+    Notes
+    -----
+    This function uses `sys.executable` to ensure the same interpreter and
+    environment as the current process.
+    """
     cmd = [sys.executable, script, *args]
     subprocess.run(cmd, check=True)
 
 
 def _count_audio_wavs() -> int:
-    """Count .wav files under the expected audio dir."""
+    """
+    Count .wav files recursively under the expected audio directory.
+
+    Returns
+    -------
+    int
+        Number of files ending with `.wav` found under `DATA_AUDIO_DIR`.
+
+    Notes
+    -----
+    Returns 0 if `DATA_AUDIO_DIR` does not exist.
+    """
     if not DATA_AUDIO_DIR.exists():
         return 0
     return sum(1 for _ in DATA_AUDIO_DIR.rglob("*.wav"))
 
 
 def _write_scope_marker(scope: str) -> None:
-    """Persist scope ('full' or 'test') so future runs can tell what's present."""
+    """
+    Write a scope marker file indicating which subset is present.
+
+    Parameters
+    ----------
+    scope : str
+        Data scope label to persist, typically ``'full'`` or ``'test'``.
+
+    Notes
+    -----
+    The marker is written to ``SCOPE_MARKER`` and used to infer whether
+    the repository contains the full dataset or a test subset on future runs.
+    Any I/O errors are caught and reported as warnings, without raising.
+    """
     try:
         SCOPE_MARKER.parent.mkdir(parents=True, exist_ok=True)
         SCOPE_MARKER.write_text(scope.strip())
@@ -53,7 +98,19 @@ def _write_scope_marker(scope: str) -> None:
 
 
 def _read_scope_marker() -> str | None:
-    """Return 'full' or 'test' if marker is present; otherwise None."""
+    """
+    Read the persisted data scope marker.
+
+    Returns
+    -------
+    str or None
+        The normalized scope string (``'full'`` or ``'test'``) if the marker
+        exists and is readable, otherwise ``None``.
+
+    Notes
+    -----
+    Any I/O errors are suppressed and result in ``None``.
+    """
     try:
         if SCOPE_MARKER.exists():
             return SCOPE_MARKER.read_text().strip().lower()
@@ -61,11 +118,30 @@ def _read_scope_marker() -> str | None:
         pass
     return None
 
+
 # ─────────────────────────────────────────────────────────────
 ### EXCTRACTION (zip, features, labels)
 # ─────────────────────────────────────────────────────────────
-
 def extract_archives(directory: Path) -> None:
+    """
+    Extract supported archives found under a directory tree.
+
+    Parameters
+    ----------
+    directory : pathlib.Path
+        Root directory to scan recursively for archives.
+
+    Notes
+    -----
+    Supports ``.zip``, ``.tar``, ``.gz`` and ``.tgz``. Archives are extracted
+    in-place to their parent directory. Errors are caught and logged.
+
+    Security
+    --------
+    Be cautious with untrusted archives; this uses standard libraries
+    (`zipfile`, `tarfile`) which do not protect against path traversal in
+    malicious archives.
+    """
     for archive in directory.rglob("*"):
         if archive.suffix.lower() in {".zip", ".tar", ".gz", ".tgz"}:
             print(f"Extracting {archive}…")
@@ -79,11 +155,23 @@ def extract_archives(directory: Path) -> None:
             except Exception as e:
                 print(f"Failed to extract {archive}: {e}")
 
+
 def ensure_features(source_dir: Path) -> None:
     """
-    Extract MFCC features if needed.
-    Extra safety: if the number of .npy files is less than the number of .wav files,
-    re-run extraction (prevents 'test' features from being reused for a larger 'full' set).
+    Ensure MFCC features are extracted for the available audio.
+
+    Parameters
+    ----------
+    source_dir : pathlib.Path
+        Directory containing raw ``.wav`` audio files.
+
+    Notes
+    -----
+    - If the number of existing ``.npy`` feature files in ``PROCESSED_ROOT``
+      is greater than or equal to the number of ``.wav`` files, extraction
+      is skipped.
+    - Otherwise, runs ``scripts/utils/audio_features.py`` to generate features
+      into ``PROCESSED_ROOT``.
     """
     PROCESSED_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -98,8 +186,21 @@ def ensure_features(source_dir: Path) -> None:
     script = str(REPO_ROOT / "scripts" / "utils" / "audio_features.py")
     _run_script(script, str(source_dir), "--out", str(PROCESSED_ROOT))
 
-
 def ensure_labels(_: Path) -> None:
+    """
+    Ensure the labels CSV is present.
+
+    Parameters
+    ----------
+    _ : pathlib.Path
+        Unused. Kept for a symmetric signature with feature extraction.
+
+    Notes
+    -----
+    If ``LABEL_FILE`` already exists, label generation is skipped.
+    Otherwise, runs ``scripts/utils/create_labels.py`` to build it based on
+    processed features.
+    """
     if LABEL_FILE.exists():
         print("Label CSV already exists. Skipping label generation.")
         return
@@ -111,14 +212,31 @@ def ensure_labels(_: Path) -> None:
 # ─────────────────────────────────────────────────────────────
 ### MODEL SELECTION (by user) AND TRAINING
 # ─────────────────────────────────────────────────────────────
-
 def _resolve_model_script(human_choice: str) -> Path:
     """
-    Map user's choice to an existing model script.
+    Resolve a human-friendly model choice to a concrete script path.
 
-    Folders (as in your layout):
+    Parameters
+    ----------
+    human_choice : str
+        User input describing the model, e.g. ``'cbam'``, ``'baseline'``,
+        or ``'cnn'``.
+
+    Returns
+    -------
+    pathlib.Path
+        Absolute path to the selected model script.
+
+    Raises
+    ------
+    FileNotFoundError
+        If no matching model script is found.
+
+    Notes
+    --------
+    Folders:
       - scripts/models/cbam/cbam.py
-      - scripts/models/no_cbam/no_cbam.py  (also try .../baseline.py if that’s your filename)
+      - scripts/models/no_cbam/no_cbam.py
       - scripts/models/baseline/baseline.py
     """
     choice = human_choice.strip().lower()
@@ -141,13 +259,26 @@ def _resolve_model_script(human_choice: str) -> Path:
     tried = " | ".join(str(p.relative_to(REPO_ROOT)) for p in candidates)
     raise FileNotFoundError(f"Could not find a model script for '{human_choice}'. Tried: {tried}")
 
-
 def _parse_model_list(text: str) -> list[str]:
     """
-    Parse a human string like:
-      "CNN+CBAM, baseline", "cbam and baseline", "baseline + cnn"
-    → returns canonical ids in order without duplicates:
-      ["cbam", "baseline"] or ["baseline", "no_cbam"], etc.
+    Parse a free-form string of model choices into canonical identifiers.
+
+    Parameters
+    ----------
+    text : str
+        A string like ``"CNN+CBAM, baseline"`` or ``"cbam and baseline"``.
+
+    Returns
+    -------
+    list of str
+        Ordered, de-duplicated canonical model ids, e.g.
+        ``['cbam', 'baseline']`` or ``['baseline', 'no_cbam']``.
+        Defaults to ``['no_cbam']`` if nothing matched.
+
+    Notes
+    -----
+    Separators such as commas, plus, slash, pipe, and the word ``and`` are
+    normalized to whitespace before tokenization.
     """
     s = text.lower()
     for ch in [",", "+", "/", "|"]:
@@ -164,10 +295,22 @@ def _parse_model_list(text: str) -> list[str]:
         elif ("cnn" in t or "no_cbam" in t or "no-cbam" in t or "nocbam" in t) and "no_cbam" not in out:
             out.append("no_cbam")
 
-    return out or ["no_cbam"]  # sensible default
-
+    return out or ["no_cbam"]
 
 def train_model(model_script: Path) -> None:
+    """
+    Launch model training by invoking the selected model script.
+
+    Parameters
+    ----------
+    model_script : pathlib.Path
+        Absolute path to the Python script that implements the model training.
+
+    Notes
+    -----
+    This function delegates execution to `_run_script`. Any non-zero exit
+    code is caught and summarized to stderr/stdout for easier diagnosis.
+    """
     print(f"Training model via: {model_script.relative_to(REPO_ROOT)}")
     try:
         _run_script(str(model_script))
@@ -182,7 +325,6 @@ def train_model(model_script: Path) -> None:
         if e.stderr:
             print("--- stderr ---")
             print(e.stderr)
-    
 
 
 # ─────────────────────────────────────────────────────────────
@@ -190,6 +332,25 @@ def train_model(model_script: Path) -> None:
 # ─────────────────────────────────────────────────────────────
 
 def main() -> None:
+    """
+    Orchestrate the end-to-end workflow: data, features, training, and reports.
+
+    Steps
+    -----
+    1. Check for presence of audio data. Optionally download either the
+       full dataset or a small test subset, and record the choice in a
+       scope marker file.
+    2. Extract archives (if any), generate MFCC features, and ensure labels.
+    3. Optionally visualize class imbalance.
+    4. Optionally train one or more model variants selected by the user.
+    5. Optionally visualize training logs (loss, accuracy, macro-F1).
+
+    Notes
+    -----
+    This function is interactive and prompts the user for choices at
+    multiple steps. It writes artifacts under the repository’s `data/`,
+    `reports/`, and model-specific output folders.
+    """
 
     # ─────────────────────────────────────────────────────────────
     # 1) Data downloading (tracking the data scope) 
@@ -272,7 +433,7 @@ def main() -> None:
 
 
     # ─────────────────────────────────────────────────────────────
-    # 4) Training
+    # 4) Training and logs visualization
     # ─────────────────────────────────────────────────────────────
     
     training_question = input("Do you wish to train the model? [y/n]: ").strip().lower()
@@ -284,7 +445,7 @@ def main() -> None:
             )
             return
 
-        model_choice = input("Which models do you wish to train? [CNN+CBAM, CNN, baseline]: ").strip()
+        model_choice = input("Which models do you wish to train? [CNN+CBAM, CNN, baseline]: ").strip().lower()
         models = _parse_model_list(model_choice)
         print("Selected models (in order):", ", ".join(models))
 
@@ -296,6 +457,38 @@ def main() -> None:
                 print(f"Skipping '{m}'.")
                 continue
             train_model(model_script)
+        
+        results_question = input('Do you want to visualize training logs? [y/n]: ').strip().lower()
+        if results_question == 'y':
+            for m in models:
+                OUT_DIR = REPO_ROOT / 'reports' / 'training_logs' / m 
+                HISTORY_CSV = REPO_ROOT / 'scripts' / 'models' / m / 'logs' / 'history.csv'
+                PREDICTIONS_CSV = REPO_ROOT / 'scripts' / 'models' / m / 'logs' / 'predictions.csv'
+
+                # Ensure output dir exists even if history plotting fails
+                OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+                try:
+                    plot_training_history(history_csv=HISTORY_CSV, outdir=OUT_DIR, title_prefix=m)
+                except Exception as exc:
+                    print(f"[visualization] Skipped history for '{m}' – {exc}")
+                try:
+                    # Evaluate this model's predictions and plot confusion matrix
+                    _, _, predictions, labels = evaluate_predictions(PREDICTIONS_CSV)
+                    plot_confusion_matrix(
+                        OUT_DIR,
+                        predictions=predictions,
+                        labels=labels,
+                        model_name=m,
+                    )
+                except Exception as exc:
+                    print(f"[visualization] Skipped confusion matrix for '{m}' – {exc}")
+            print(
+                'Displaying the training logs for training and validation sets.\n'
+                'The following quantities are plotted: Loss, Accuracy, Macro F1 score.'
+            )
+        else:
+            print('Training logs are not visualized.')
     else:
         print("Training model terminated.")
 

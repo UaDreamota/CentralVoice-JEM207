@@ -54,14 +54,14 @@ class CSVHistoryLogger:
     Purpose: Append (epoch, split) metrics to a CSV; save run summary to JSON.
 
     Fields written to CSV (stable schema):
-    epoch,split,loss,acc,macro_f1,ua,lr,wall_time
+    epoch,split,loss,acc,macro_f1,lr,wall_time
     """
     def __init__(self, logdir: Path, filename: str = "history.csv") -> None:
         self.logdir = Path(logdir)
         self.logdir.mkdir(parents=True, exist_ok=True)
         self.path = self.logdir / filename
         self._initialized = self.path.exists()
-        self._fieldnames = ["epoch","split","loss","acc","macro_f1","ua","lr","wall_time"]
+        self._fieldnames = ["epoch","split","loss","acc","macro_f1","lr","wall_time"]
 
     def log(self, **row: Any) -> None:
         # ensure known fields; fill missing with ""

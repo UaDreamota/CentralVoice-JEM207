@@ -65,4 +65,4 @@ def evaluate_predictions(log_dir: str) -> tuple[float, list[float]]:
     print(f"Evaluation – per‑class accuracy: {class_accuracy}")
     print(f"Macro F1-score: {f1_macro:.4f}")
 
-    return accuracy, class_accuracy
+    return accuracy, class_accuracy, preds, labels

@@ -96,7 +96,6 @@ class SimpleCNN(nn.Module):
 ###  Utility functions
 # ─────────────────────────────────────────────────────────────
 
-
 def set_torch_seed(seed: int, threads: int = 1) -> None:
     random.seed(seed)
     np.random.seed(seed)
@@ -108,33 +107,16 @@ def set_torch_seed(seed: int, threads: int = 1) -> None:
     torch.set_num_threads(threads)
     torch.set_num_interop_threads(threads)
 
-
 def xavier_init(m: nn.Module) -> None:
     if isinstance(m, (nn.Linear, nn.Conv2d)):
         nn.init.xavier_uniform_(m.weight)
         if m.bias is not None:
             nn.init.zeros_(m.bias)
 
-def shutdown_dataloaders(*loaders) -> None:
-    """Gracefully terminate DataLoader workers.
-    PyTorch's DataLoader keeps worker threads alive when `persistent_workers`
-    is enabled.  Explicitly shutting them down avoids "threads alive at
-    shutdown" warnings and non‑zero exit codes.
-    """
-    for dl in loaders:
-        try:
-            iterator = getattr(dl, "_iterator", None)
-            if iterator is not None:
-                iterator._shutdown_workers()
-                dl._iterator = None  # remove references so workers can exit
-        except Exception:
-            pass
-
 
 # ─────────────────────────────────────────────────────────────
 ###  MAIN FUNCTION
 # ─────────────────────────────────────────────────────────────
-
 
 def main(args: argparse.Namespace) -> None:  # noqa: C901
     # 1) reproducibility & logging‑folder -------------------------------------
@@ -175,7 +157,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
     # 4) training loop ------------------------------------------------------
     best_dev_acc = 0.0
     patience_counter, patience = 0, 5
-    for epoch in range(args.epochs):
+    for epoch in range(1, args.epochs):
 
         t0 = time()
         # Train phase -------------------------------------------------------
@@ -292,15 +274,6 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
             writer.writerow([f"sample_{i}", p])
     print(f"Predictions saved to {pred_file}")
 
-
-    # 6) automatic evaluation ----------------------------------------------
-    try:
-        overall_acc, per_class_acc = evaluate_predictions(args.logdir)
-    except Exception as exc:  # keep the run alive even if eval fails
-        print(f"Post‑run evaluation skipped – {exc}")
-    finally:
-        shutdown_dataloaders(train_dl, dev_dl, test_dl)
-        
 
 
 if __name__ == "__main__":

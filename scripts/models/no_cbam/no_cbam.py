@@ -187,7 +187,6 @@ class FCNN(nn.Module):
 ###  Utility functions
 # ─────────────────────────────────────────────────────────────
 
-
 def set_torch_seed(seed: int, threads: int = 1):
     random.seed(seed)
     np.random.seed(seed)
@@ -199,7 +198,6 @@ def set_torch_seed(seed: int, threads: int = 1):
     torch.set_num_threads(threads)
     torch.set_num_interop_threads(threads)
 
-
 def xavier_init(m: nn.Module):
     if isinstance(m, (nn.Linear, nn.Conv2d)):
         nn.init.xavier_uniform_(m.weight)
@@ -210,7 +208,6 @@ def xavier_init(m: nn.Module):
 # ─────────────────────────────────────────────────────────────
 ###  MAIN FUNCTION
 # ─────────────────────────────────────────────────────────────
-
 
 def main(args: argparse.Namespace) -> None:
 
@@ -251,7 +248,7 @@ def main(args: argparse.Namespace) -> None:
     # 4) training loop ------------------------------------------------------------------
     best_dev_acc = 0.0
     patience_counter, patience = 0, 5
-    for epoch in range(args.epochs):
+    for epoch in range(1, args.epochs):
         # ‑‑ train phase ----------------------------------------------------------
         model.train()
         epoch_loss, batches = 0.0, 0
@@ -344,17 +341,6 @@ def main(args: argparse.Namespace) -> None:
         for i, p in enumerate(test_preds):
             writer.writerow([f"sample_{i}", p])
     print(f"Predictions saved to {pred_file}")
-
-    # 6) automatic evaluation (requires ground‑truth labels) ----------------------------
-    try:
-        overall_acc, per_class_acc = evaluate_predictions(args.logdir)
-        print(f"Evaluation – overall accuracy: {overall_acc:.4f}")
-        print(f"Evaluation – per‑class accuracy: {per_class_acc}")
-    except (
-        Exception
-    ) as exc:  # broad, but we want to keep the run alive even if eval fails
-        print(f"Post‑run evaluation skipped – {exc}")
-
 
 if __name__ == "__main__":
     cli_args = parser.parse_args([] if "__file__" not in globals() else None)
