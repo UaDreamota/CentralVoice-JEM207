@@ -227,6 +227,14 @@ def plot_confusion_matrix(
     Path
         Path to the saved PNG image.
     """
+    predictions = torch.as_tensor(predictions)
+    labels = torch.as_tensor(labels)
+
+    # If predictions are logits/probabilities (N×C), reduce to argmax
+    if predictions.ndim > 1:
+        predictions = predictions.argmax(dim=1)
+    if labels.ndim > 1:
+        labels = labels.argmax(dim=1)
 
     cm_metric = ConfusionMatrix(task="multiclass", num_classes=6)
     cm = cm_metric(predictions, labels).numpy()
