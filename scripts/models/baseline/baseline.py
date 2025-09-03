@@ -20,7 +20,6 @@ from torchmetrics import F1Score
 from scripts.utils.datasets import create_dataloaders
 
 from scripts.utils.logging import setup_logging, CSVHistoryLogger
-from scripts.utils.eval_pred import evaluate_predictions
 
 # ─────────────────────────────────────────────────────────────
 ### DYNAMIC ARGUMENTS
@@ -196,15 +195,15 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
             for feats, label in dev_dl:
                 feats, label = feats.to(device), label.to(device)
                 outputs = model(feats)
-                prediction = outputs.argmax(dim = 1) 
+                prediction = outputs.argmax(dim = 1)
 
                 val_loss += loss_fn(outputs, label).item()
                 val_batches += 1
                 correct += (prediction == label).sum().item()
                 total += label.size(0)
                 macro_f1.update(prediction, label)
-                
-                
+
+
         dev_acc = correct / total if total else 0.0
         val_loss_mean = val_loss / val_batches
         dev_f1 = float(macro_f1.compute().item())

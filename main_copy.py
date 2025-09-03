@@ -458,7 +458,7 @@ def main() -> None:
             for m in models:
                 OUT_DIR = REPO_ROOT / 'reports' / 'training_logs' / m 
                 HISTORY_CSV = REPO_ROOT / 'scripts' / 'models' / m / 'logs' / 'history.csv'
-                PREDICTIONS_CSV = REPO_ROOT / 'scripts' / 'models' / m / 'logs' / 'predictions.csv'
+                PREDICTIONS_DIR = REPO_ROOT / 'scripts' / 'models' / m / 'logs'
 
                 # Ensure output dir exists even if history plotting fails
                 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -469,7 +469,7 @@ def main() -> None:
                     print(f"[visualization] Skipped history for '{m}' – {exc}")
                 try:
                     # Evaluate this model's predictions and plot confusion matrix
-                    _, _, predictions, labels = evaluate_predictions(PREDICTIONS_CSV)
+                    _, _, predictions, labels = evaluate_predictions(PREDICTIONS_DIR)
                     plot_confusion_matrix(
                         OUT_DIR,
                         predictions=predictions,

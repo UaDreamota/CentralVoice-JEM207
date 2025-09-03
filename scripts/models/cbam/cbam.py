@@ -14,11 +14,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchmetrics import F1Score
 
 from scripts.utils.datasets import create_dataloaders
-from scripts.utils.logging import logging
-
-from scripts.utils.eval_pred import evaluate_predictions
+from scripts.utils.logging import setup_logging, CSVHistoryLogger
 
 # ─────────────────────────────────────────────────────────────
 ### DYNAMIC ARGUMENTS
@@ -26,7 +25,7 @@ from scripts.utils.eval_pred import evaluate_predictions
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=24, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=1, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument(
     "--threads", default=1, type=int, help="Maximum number of threads to use."
@@ -321,7 +320,7 @@ def main(
         ),
     )
     os.makedirs(args.logdir, exist_ok=True)
-    logging(args.logdir)
+    setup_logging(args.logdir)
 
     # 2) data ---------------------------------------------------------------------------
     train_dl, dev_dl, test_dl = create_dataloaders(args.batch_size)
@@ -338,19 +337,26 @@ def main(
         optimizer, T_max=args.epochs * len(train_dl), eta_min=args.lr * 0.01
     )
     loss_fn = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
+    macro_f1 = F1Score(task='multiclass', num_classes=6, average='macro').to(device)
+    logger = CSVHistoryLogger(args.logdir)
 
-    # 4) training loop ------------------------------------------------------------------
+    # 4) training loop ------------------------------------------------------
     best_dev_acc = 0.0
     patience_counter, patience = 0, 5
     for epoch in range(1, args.epochs):
-        # ‑‑ train phase ----------------------------------------------------------
+
+        t0 = time()
+        # Train phase -------------------------------------------------------
         model.train()
+
+        macro_f1.reset()
         epoch_loss, batches = 0.0, 0
         train_correct = train_total = 0
         for feats, label in train_dl:
             feats, label = feats.to(device), label.to(device)
             optimizer.zero_grad()
             out = model(feats)
+            pred = out.argmax(dim=1)
             loss = loss_fn(out, label)
             loss.backward()
             optimizer.step()
@@ -358,31 +364,43 @@ def main(
 
             epoch_loss += loss.item()
             batches += 1
-            train_correct += (out.argmax(dim=1) == label).sum().item()
+            train_correct += (pred == label).sum().item()
             train_total += label.size(0)
+            macro_f1.update(pred, label)
 
         train_acc = train_correct / train_total if train_total else 0.0
         train_loss_mean = epoch_loss / batches
+        train_f1 = float(macro_f1.compute().item())
 
-        # ‑‑ dev phase ------------------------------------------------------------
+        # Dev phase ---------------------------------------------------------
         model.eval()
+
+        macro_f1.reset()
         correct = total = val_batches = 0
         val_loss = 0.0
         with torch.no_grad():
             for feats, label in dev_dl:
                 feats, label = feats.to(device), label.to(device)
                 outputs = model(feats)
-                val_loss += loss_fn(outputs, label).item()
-                correct += (outputs.argmax(dim=1) == label).sum().item()
-                total += label.size(0)
-                val_batches += 1
-        dev_acc = correct / total if total else 0.0
+                prediction = outputs.argmax(dim=1)
 
-        # ‑‑ checkpoint / early‑stopping -----------------------------------------
-        if dev_acc > best_dev_acc + 1e-4:  # tiny delta avoids float noise
+                val_loss += loss_fn(outputs, label).item()
+                val_batches += 1
+                correct += (prediction == label).sum().item()
+                total += label.size(0)
+                macro_f1.update(prediction, label)
+
+        dev_acc = correct / total if total else 0.0
+        val_loss_mean = val_loss / val_batches
+        dev_f1 = float(macro_f1.compute().item())
+
+        wall = time() - t0
+
+        # Checkpoint / early stopping --------------------------------------
+        if dev_acc > best_dev_acc + 1e-4:
             best_dev_acc = dev_acc
             patience_counter = 0
-            if epoch > 10:  # save only after some epochs
+            if epoch > 10:
                 torch.save(
                     model.state_dict(),
                     os.path.join(
@@ -401,11 +419,16 @@ def main(
 
         current_lr = optimizer.param_groups[0]["lr"]
         print(
-            f"Epoch {epoch + 1}: train_loss {train_loss_mean:.4f}, train_acc {train_acc:.4f}, "
-            f"dev_acc {dev_acc:.4f}, lr {current_lr:.6f}"
+            f"Epoch {epoch + 1}: \n train_loss {train_loss_mean:.4f}, train_acc {train_acc:.4f}, train_f1 {train_f1:.4f} \n"
+            f"dev_loss {val_loss_mean:.4f}, dev_acc {dev_acc:.4f}, dev_f1 {dev_f1:.4f}, lr {current_lr:.6f}"
         )
 
-    # 5) test‑predictions ---------------------------------------------------------------
+        logger.log(epoch=epoch, split="train",
+                   loss=train_loss_mean, acc=train_acc, macro_f1=train_f1, lr=current_lr, wall_time=wall)
+        logger.log(epoch=epoch, split="dev",
+                   loss=val_loss_mean, acc=dev_acc, macro_f1=dev_f1, lr=current_lr, wall_time=wall)
+
+    # 5) test predictions ---------------------------------------------------
     ckpts = sorted(Path(args.logdir).glob("best_model_*.pt"))
     if ckpts:
 
