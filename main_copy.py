@@ -464,7 +464,26 @@ def main() -> None:
         if results_question == 'y':
             for m in models:
                 OUT_DIR = REPO_ROOT / 'reports' / 'training_logs' / m
-                LOGS_DIR = REPO_ROOT / 'scripts' / 'models' / m / 'logs'
+
+                # Resolve the model script to build the expected logs path
+                script_path = _resolve_model_script(m)
+                logs_root = script_path.parent / 'logs'
+
+                # Expected run-name with default args used by the scripts
+                # e.g., "baseline.py-bs=24,d=0.2,e=2,ls=0.05,l=0.001,s=42,t=1"
+                default_alias = "bs=24,d=0.2,e=2,ls=0.05,l=0.001,s=42,t=1"
+                expected_run = f"{script_path.name}-{default_alias}"
+                expected_dir = logs_root / expected_run
+
+                if expected_dir.exists():
+                    LOGS_DIR = expected_dir
+                else:
+                    # Fallback: pick the most recent run for this script
+                    candidates = [
+                        p for p in logs_root.glob(f"{script_path.name}-*") if p.is_dir()
+                    ]
+                    LOGS_DIR = max(candidates, key=lambda p: p.stat().st_mtime) if candidates else logs_root
+
                 HISTORY_CSV = LOGS_DIR / 'history.csv'
                 PREDICTIONS_CSV = LOGS_DIR / 'predictions.csv'
 
