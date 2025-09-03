@@ -463,20 +463,25 @@ def main() -> None:
         results_question = input('Do you want to visualize training logs? [y/n]: ').strip().lower()
         if results_question == 'y':
             for m in models:
-                OUT_DIR = REPO_ROOT / 'reports' / 'training_logs' / m 
-                HISTORY_CSV = REPO_ROOT / 'scripts' / 'models' / m / 'logs' / 'history.csv'
-                PREDICTIONS_DIR = REPO_ROOT / 'scripts' / 'models' / m / 'logs'
+                OUT_DIR = REPO_ROOT / 'reports' / 'training_logs' / m
+                LOGS_DIR = REPO_ROOT / 'scripts' / 'models' / m / 'logs'
+                HISTORY_CSV = LOGS_DIR / 'history.csv'
+                PREDICTIONS_CSV = LOGS_DIR / 'predictions.csv'
 
                 # Ensure output dir exists even if history plotting fails
                 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+                # 1) Training history
                 try:
-                    plot_training_history(history_csv=HISTORY_CSV, outdir=OUT_DIR, title_prefix=m)
+                    if HISTORY_CSV.exists():
+                        plot_training_history(history_csv=HISTORY_CSV, outdir=OUT_DIR, title_prefix=m)
+                    else:
+                        print(f"[visualization] Skipped history for '{m}' – missing file: {HISTORY_CSV}")
                 except Exception as exc:
                     print(f"[visualization] Skipped history for '{m}' – {exc}")
                 try:
                     # Evaluate this model's predictions and plot confusion matrix
-                    _, _, predictions, labels = evaluate_predictions(PREDICTIONS_DIR)
+                    _, _, predictions, labels = evaluate_predictions(log_dir=LOGS_DIR)
                     plot_confusion_matrix(
                         OUT_DIR,
                         predictions=predictions,
