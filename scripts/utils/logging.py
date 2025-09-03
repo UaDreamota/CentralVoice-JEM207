@@ -3,8 +3,8 @@ from __future__ import annotations
 import os, sys, datetime, atexit
 
 from pathlib import Path
-import csv, json
-from typing import Dict, Any, Optional
+import csv
+from typing import Any
 
 
 class _Tee:
@@ -56,29 +56,26 @@ class CSVHistoryLogger:
     Fields written to CSV (stable schema):
     epoch,split,loss,acc,macro_f1,lr,wall_time
     """
-    def __init__(self, logdir: Path, filename: str = "history.csv") -> None:
+    def __init__(self, logdir: str, filename: str = "history.csv") -> None:
         self.logdir = Path(logdir)
         self.logdir.mkdir(parents=True, exist_ok=True)
         self.path = self.logdir / filename
-        self._initialized = self.path.exists()
         self._fieldnames = ["epoch","split","loss","acc","macro_f1","lr","wall_time"]
+
+        # recreate CSV file and write header immediately
+        with self.path.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=self._fieldnames)
+            w.writeheader()
+
+        print(f"Logging training history to {self.path}")
 
     def log(self, **row: Any) -> None:
         # ensure known fields; fill missing with ""
         record = {k: row.get(k, "") for k in self._fieldnames}
         with self.path.open("a", newline="") as f:
             w = csv.DictWriter(f, fieldnames=self._fieldnames)
-            if not self._initialized:
-                w.writeheader()
-                self._initialized = True
             w.writerow(record)
 
-    def save_summary(self, *, best_dev_epoch: int, best_dev_macro_f1: float,
-                     early_stop_epoch: Optional[int] = None) -> None:
-        summary = {
-            "best_dev_epoch": int(best_dev_epoch),
-            "best_dev_macro_f1": float(best_dev_macro_f1),
-            "early_stop_epoch": (None if early_stop_epoch is None else int(early_stop_epoch)),
-        }
-        (self.logdir / "metrics.json").write_text(json.dumps(summary, indent=2))
+
+
 

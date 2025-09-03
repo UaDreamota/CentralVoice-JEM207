@@ -156,7 +156,7 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
     # 4) training loop ------------------------------------------------------
     best_dev_acc = 0.0
     patience_counter, patience = 0, 5
-    for epoch in range(1, args.epochs):
+    for epoch in range(1, args.epochs + 1):
 
         t0 = time()
         # Train phase -------------------------------------------------------
@@ -226,14 +226,14 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
             patience_counter += 1
             if patience_counter >= patience:
                 print(
-                    f"No dev‑accuracy gain for {patience} epochs – early stopping at epoch {epoch + 1}. "
+                    f"No dev‑accuracy gain for {patience} epochs – early stopping at epoch {epoch}. "
                     f"Best dev accuracy: {best_dev_acc:.4f}"
                 )
                 break
 
         current_lr = optimizer.param_groups[0]["lr"]
         print(
-            f"Epoch {epoch + 1}: \n train_loss {train_loss_mean:.4f}, train_acc {train_acc:.4f}, train_f1 {train_f1:.4f} \n"
+            f"Epoch {epoch}: \n train_loss {train_loss_mean:.4f}, train_acc {train_acc:.4f}, train_f1 {train_f1:.4f} \n"
             f"dev_loss {val_loss_mean:.4f}, dev_acc {dev_acc:.4f}, dev_f1 {dev_f1:.4f}, lr {current_lr:.6f}"
         )
 
