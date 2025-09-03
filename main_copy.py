@@ -54,7 +54,9 @@ def _run_script(script: str, *args: str) -> None:
     - Stdout/stderr are not captured; they stream directly to this process.
     """
     cmd = [sys.executable, script, *args]
-    subprocess.run(cmd, check=True)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    subprocess.run(cmd, check=True, cwd=REPO_ROOT, env=env)
 
 
 def _count_audio_wavs() -> int:
@@ -378,7 +380,7 @@ def main() -> None:
                 data_scope = "test"
             elif test_data_question == "full":
                 print("Creating 50 file batches. This may take a while...")
-                download_data(FOLDER_URL_DATA, UNPROCESSED_ROOT)
+                download_data(FOLDER_URL_DATA, str(UNPROCESSED_ROOT))
                 extract_archives(UNPROCESSED_ROOT)
                 _write_scope_marker("full")
                 data_scope = "full"

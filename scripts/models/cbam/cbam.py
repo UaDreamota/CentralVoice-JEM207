@@ -18,7 +18,7 @@ import torch.nn.functional as F
 from torchmetrics import F1Score
 
 from scripts.utils.datasets import create_dataloaders
-from scripts.utils.logging import setup_logging, CSVHistoryLogger
+from scripts.utils.app_logging import setup_logging, CSVHistoryLogger
 
 # ─────────────────────────────────────────────────────────────
 ### DYNAMIC ARGUMENTS

@@ -18,7 +18,7 @@ from torchaudio.transforms import FrequencyMasking, TimeMasking
 
 # Repository root and dataset location
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CREMA_ROOT = REPO_ROOT / "data" / "processed"
+CREMA_ROOT = REPO_ROOT / "data"
 
 # ─────────────────────────────────────────────────────────────
 ### DATASET
