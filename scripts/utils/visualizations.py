@@ -1,4 +1,4 @@
-# scripts/utils/viz.py
+# scripts/utils/vizualizations.py
 
 # ─────────────────────────────────────────────────────────────
 # Visualization helpers for data and metrics 

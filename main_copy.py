@@ -256,41 +256,48 @@ def _resolve_model_script(human_choice: str) -> Path:
 
 def _parse_model_list(text: str) -> list[str]:
     """
-    Parse a free-form string of model choices into canonical identifiers.
+    Parse a user input into a list of model ids, accepting only:
+    baseline, cbam, no_cbam. Re-prompts until valid.
 
     Parameters
     ----------
     text : str
-        A string like ``"CNN+CBAM, baseline"`` or ``"cbam and baseline"``.
+        Initial user input.
 
     Returns
     -------
-    list of str
-        Ordered, de-duplicated canonical model ids, e.g.
-        ``['cbam', 'baseline']`` or ``['baseline', 'no_cbam']``.
-        Defaults to ``['no_cbam']`` if nothing matched.
-
-    Notes
-    -----
-    Separators such as commas, plus, slash, pipe, and the word ``and`` are
-    normalized to whitespace before tokenization.
+    list[str]
+        Ordered, de-duplicated canonical ids from {'baseline','cbam','no_cbam'}.
     """
-    s = text.lower()
-    for ch in [",", "+", "/", "|"]:
-        s = s.replace(ch, " ")
-    s = s.replace(" and ", " ")
-    tokens = s.split()
+    allowed = {"baseline", "cbam", "no_cbam"}
 
-    out: list[str] = []
-    for t in tokens:
-        if "cbam" in t and "cbam" not in out:
-            out.append("cbam")
-        elif "base" in t and "baseline" not in out:
-            out.append("baseline")
-        elif ("cnn" in t or "no_cbam" in t or "no-cbam" in t or "nocbam" in t) and "no_cbam" not in out:
-            out.append("no_cbam")
+    def _tokenize(s: str) -> list[str]:
+        s = s.lower()
+        for ch in [",", "+", "/", "|"]:
+            s = s.replace(ch, " ")
+        s = s.replace(" and ", " ")
+        return s.split()
 
-    return out or ["no_cbam"]
+    tokens = _tokenize(text)
+
+    while True:
+        invalid = [t for t in tokens if t not in allowed]
+        # keep order, remove duplicates
+        out: list[str] = []
+        for t in tokens:
+            if t in allowed and t not in out:
+                out.append(t)
+
+        if invalid or not out:
+            if invalid:
+                print(f"Invalid choice(s): {', '.join(invalid)}.")
+            print("Allowed choices are: baseline, cbam, no_cbam.")
+            retry = input("Please type model names separated by commas: ").strip()
+            tokens = _tokenize(retry)
+            continue
+
+        return out
+
 
 def train_model(model_script: Path) -> None:
     """
@@ -350,7 +357,7 @@ def main() -> None:
     # ─────────────────────────────────────────────────────────────
     # 1) Data downloading (tracking the data scope) 
     # ─────────────────────────────────────────────────────────────
-    data_scope = None  # 'full' | 'test' | 'existing'
+    data_scope = None  # 'full' | 'test' 
 
     if not DATA_AUDIO_DIR.exists() or not any(DATA_AUDIO_DIR.iterdir()):
         print("Wait! Data is missing.")
@@ -381,7 +388,7 @@ def main() -> None:
         else:
             print("You may now only run the inference script, as the data is missing.")
             return
-    else:
+    else: 
         # Data exists; try to identify scope
         scope = _read_scope_marker()
         if scope in {"full", "test"}:
@@ -440,7 +447,7 @@ def main() -> None:
             )
             return
 
-        model_choice = input("Which models do you wish to train? [CNN+CBAM, CNN, baseline]: ").strip().lower()
+        model_choice = input("Which models do you wish to train? [CBAM, NO_CBAM, baseline]: ").strip().lower()
         models = _parse_model_list(model_choice)
         print("Selected models (in order):", ", ".join(models))
 
