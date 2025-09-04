@@ -62,7 +62,7 @@ def evaluate_predictions(log_dir: str) -> tuple[float, list[float]]:
 
     print("Confusion matrix:\n", confusion)
     print(f"Evaluation – overall accuracy: {accuracy:.4f}")
-    print(f"Evaluation – per‑class accuracy: {class_accuracy}")
+    print(f"Evaluation – per‑class recall: {class_accuracy}")
     print(f"Macro F1-score: {f1_macro:.4f}")
 
     return accuracy, class_accuracy, preds, labels
