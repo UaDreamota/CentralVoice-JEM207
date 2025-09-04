@@ -183,7 +183,7 @@ def plot_training_history(
 
         # vertical markers
         ax.axvline(early_stop_epoch, color="red",   linestyle="--", label="early stop")
-        ax.axvline(best_epoch,       color="green", linestyle=":",  label=f"best valiation {ylabel.lower()}")
+        ax.axvline(best_epoch,       color="green", linestyle=":",  label=f"best validation {ylabel.lower()}")
 
         # green dot at best dev point
         ax.scatter([best_epoch], [best_value], color="green", zorder=5)
