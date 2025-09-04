@@ -333,6 +333,39 @@ def train_model(model_script: Path) -> None:
             print(e.stderr)
 
 
+def _pick_logs_run_dir(logs_root: Path) -> Path:
+    """
+    Return the most recent run directory under `logs_root` that contains
+    history.csv or predictions.csv. Falls back to `logs_root` if none found.
+    """
+    if not logs_root.exists():
+        return logs_root
+
+    def has_csv(d: Path) -> bool:
+        return (d / "history.csv").exists() or (d / "predictions.csv").exists()
+
+    # Collect candidates (shallow and recursive, to be safe)
+    candidates: list[Path] = []
+    try:
+        for d in logs_root.iterdir():
+            if d.is_dir() and has_csv(d):
+                candidates.append(d)
+        for d in logs_root.rglob("*"):
+            if d.is_dir() and has_csv(d):
+                candidates.append(d)
+    except Exception:
+        pass
+
+    if not candidates:
+        return logs_root
+
+    def mtime(d: Path) -> float:
+        m1 = (d / "history.csv").stat().st_mtime if (d / "history.csv").exists() else 0.0
+        m2 = (d / "predictions.csv").stat().st_mtime if (d / "predictions.csv").exists() else 0.0
+        return max(m1, m2, d.stat().st_mtime)
+
+    return max(candidates, key=mtime)
+
 # ─────────────────────────────────────────────────────────────
 ### MAIN
 # ─────────────────────────────────────────────────────────────
@@ -469,29 +502,17 @@ def main() -> None:
             for m in models:
                 OUT_DIR = REPO_ROOT / 'reports' / 'training_logs' / m
 
-                # Resolve the model script to build the expected logs path
+                # Resolve the model script to locate its logs
                 script_path = _resolve_model_script(m)
                 logs_root = script_path.parent / 'logs'
 
-                # Expected run-name with default args used by the scripts
-                # e.g., "baseline.py-bs=24,d=0.2,e=2,ls=0.05,l=0.001,s=42,t=1"
-                default_alias = "bs=24,d=0.2,e=2,ls=0.05,l=0.001,s=42,t=1"
-                expected_run = f"{script_path.name}-{default_alias}"
-                expected_dir = logs_root / expected_run
-
-                if expected_dir.exists():
-                    LOGS_DIR = expected_dir
-                else:
-                    # Fallback: pick the most recent run for this script
-                    candidates = [
-                        p for p in logs_root.glob(f"{script_path.name}-*") if p.is_dir()
-                    ]
-                    LOGS_DIR = max(candidates, key=lambda p: p.stat().st_mtime) if candidates else logs_root
+                # Pick the latest run dir that actually has CSVs,
+                # regardless of whether it’s named 'bs=...' or 'baseline.py-bs=...'
+                LOGS_DIR = _pick_logs_run_dir(logs_root)
 
                 HISTORY_CSV = LOGS_DIR / 'history.csv'
                 PREDICTIONS_CSV = LOGS_DIR / 'predictions.csv'
 
-                # Ensure output dir exists even if history plotting fails
                 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
                 # 1) Training history
@@ -503,14 +524,8 @@ def main() -> None:
                 except Exception as exc:
                     print(f"[visualization] Skipped history for '{m}' – {exc}")
                 try:
-                    # Evaluate this model's predictions and plot confusion matrix
                     _, _, predictions, labels = evaluate_predictions(log_dir=LOGS_DIR)
-                    plot_confusion_matrix(
-                        OUT_DIR,
-                        predictions=predictions,
-                        labels=labels,
-                        model_name=m,
-                    )
+                    plot_confusion_matrix(OUT_DIR, predictions=predictions, labels=labels, model_name=m)
                 except Exception as exc:
                     print(f"[visualization] Skipped confusion matrix for '{m}' – {exc}")
             print(
