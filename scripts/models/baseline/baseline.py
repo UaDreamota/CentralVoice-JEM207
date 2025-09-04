@@ -225,6 +225,15 @@ def main(args: argparse.Namespace) -> None:  # noqa: C901
         else:
             patience_counter += 1
             if patience_counter >= patience:
+                # Ensure a checkpoint exists before stopping
+                if not list(Path(args.logdir).glob("best_model_*.pt")):
+                    torch.save(
+                        model.state_dict(),
+                        os.path.join(
+                            args.logdir,
+                            f"best_model_t{train_acc:.4f}_d{best_dev_acc:.4f}.pt",
+                        ),
+                    )
                 print(
                     f"No dev‑accuracy gain for {patience} epochs – early stopping at epoch {epoch}. "
                     f"Best dev accuracy: {best_dev_acc:.4f}"

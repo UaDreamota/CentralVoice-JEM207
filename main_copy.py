@@ -211,43 +211,45 @@ def ensure_labels(_: Path) -> None:
 # ─────────────────────────────────────────────────────────────
 def _resolve_model_script(human_choice: str) -> Path:
     """
-    Resolve a human-friendly model choice to a concrete script path.
+    Map a user-entered model choice to the concrete training script path.
 
     Parameters
     ----------
     human_choice : str
-        User input describing the model, e.g. ``'cbam'``, ``'baseline'``,
-        or ``'cnn'``.
+        Case-insensitive model id. Supported canonical values:
+        - "no_cbam"
+        - "cbam"
+        - "baseline"
+        Any other value is treated as "baseline" for compatibility (e.g., "cnn").
 
     Returns
     -------
     pathlib.Path
-        Absolute path to the selected model script.
+        Absolute path to the selected model script:
+        - scripts/models/no_cbam/no_cbam.py
+        - scripts/models/cbam/cbam.py
+        - scripts/models/baseline/baseline.py
 
     Raises
     ------
     FileNotFoundError
-        If no matching model script is found.
+        If the resolved candidate script does not exist. The error message
+        lists all paths that were attempted.
 
     Notes
-    --------
-    Folders:
-      - scripts/models/cbam/cbam.py
-      - scripts/models/no_cbam/no_cbam.py
-      - scripts/models/baseline/baseline.py
+    -----
+    Selection uses exact string matches, avoiding the earlier bug where
+    substring checks caused "no_cbam" to be mistakenly resolved as "cbam".
     """
     choice = human_choice.strip().lower()
 
-    if "cbam" in choice:
+    # Use exact matches to avoid 'cbam' matching 'no_cbam'
+    if choice == "no_cbam":
+        candidates = [REPO_ROOT / "scripts" / "models" / "no_cbam" / "no_cbam.py"]
+    elif choice == "cbam":
         candidates = [REPO_ROOT / "scripts" / "models" / "cbam" / "cbam.py"]
-    elif "baseline" in choice:
-        candidates = [REPO_ROOT / "scripts" / "models" / "baseline" / "baseline.py"]
     else:
-        # default: plain CNN (no attention)
-        candidates = [
-            REPO_ROOT / "scripts" / "models" / "no_cbam" / "no_cbam.py",
-            REPO_ROOT / "scripts" / "models" / "no_cbam" / "baseline.py",  # alternate filename
-        ]
+        candidates = [REPO_ROOT / "scripts" / "models" / "baseline" / "baseline.py"]
 
     for p in candidates:
         if p.exists():

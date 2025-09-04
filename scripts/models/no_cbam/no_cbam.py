@@ -213,15 +213,15 @@ def main(args: argparse.Namespace) -> None:
     # 1) reproducibility & logging‑folder ------------------------------------------------
     set_torch_seed(args.seed, args.threads)
 
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     args.logdir = os.path.join(
+        base_dir,
         "logs",
         "{}-{}".format(
             os.path.basename(globals().get("__file__", "notebook")),
             ",".join(
-                (
-                    "{}={}".format(re.sub("(.)[^_]*_?", r"\1", k), v)
-                    for k, v in sorted(vars(args).items())
-                )
+                "{}={}".format(re.sub("(.)[^_]*_?", r"\1", k), v)
+                for k, v in sorted(vars(args).items())
             ),
         ),
     )
@@ -249,7 +249,7 @@ def main(args: argparse.Namespace) -> None:
     # 4) training loop ------------------------------------------------------
     best_dev_acc = 0.0
     patience_counter, patience = 0, 5
-    for epoch in range(1, args.epochs):
+    for epoch in range(1, args.epochs + 1):
 
         t0 = time()
         # Train phase -------------------------------------------------------
@@ -317,15 +317,24 @@ def main(args: argparse.Namespace) -> None:
         else:
             patience_counter += 1
             if patience_counter >= patience:
+                # Ensure a checkpoint exists before stopping
+                if not list(Path(args.logdir).glob("best_model_*.pt")):
+                    torch.save(
+                        model.state_dict(),
+                        os.path.join(
+                            args.logdir,
+                            f"best_model_t{train_acc:.4f}_d{best_dev_acc:.4f}.pt",
+                        ),
+                    )
                 print(
-                    f"No dev‑accuracy gain for {patience} epochs – early stopping at epoch {epoch + 1}. "
+                    f"No dev‑accuracy gain for {patience} epochs – early stopping at epoch {epoch}. "
                     f"Best dev accuracy: {best_dev_acc:.4f}"
                 )
                 break
 
         current_lr = optimizer.param_groups[0]["lr"]
         print(
-            f"Epoch {epoch + 1}: \n train_loss {train_loss_mean:.4f}, train_acc {train_acc:.4f}, train_f1 {train_f1:.4f} \n"
+            f"Epoch {epoch}: \n train_loss {train_loss_mean:.4f}, train_acc {train_acc:.4f}, train_f1 {train_f1:.4f} \n"
             f"dev_loss {val_loss_mean:.4f}, dev_acc {dev_acc:.4f}, dev_f1 {dev_f1:.4f}, lr {current_lr:.6f}"
         )
 
