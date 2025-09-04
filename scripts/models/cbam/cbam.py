@@ -42,16 +42,10 @@ parser.add_argument(
     help="Reduction ratio for the MLP hidden layer size.",
 )
 parser.add_argument(
-    "--drop1",
-    default=0.2,
+    "--drop",
+    default=0.4,
     type=float,
     help="Dropout rate in the 1st FC layer of the classification head.",
-)
-parser.add_argument(
-    "--drop2",
-    default=0.2,
-    type=float,
-    help="Dropout rate in the 2nd FC layer of the classification head.",
 )
 
 
@@ -192,7 +186,7 @@ class FCNN(nn.Module):
     Output: (B, 64, 9, 9)        ── compact feature map
     """
 
-    def __init__(self, dropout1=0.2, dropout2=0.2, red_rat=16):
+    def __init__(self, dropout=0.2, red_rat=16):
         super().__init__()
 
         # (a) Shrink x-axis from 218 → 109
@@ -240,7 +234,7 @@ class FCNN(nn.Module):
         self.flatten = nn.Flatten()  # → 128·4·4 = 2048
         self.fc = nn.Linear(2048, 256, bias=True)
         self.relu = nn.ReLU(inplace=True)
-        self.drop = nn.Dropout(p=dropout1)
+        self.drop = nn.Dropout(p=dropout)
 
         self.class_l = nn.Linear(256, 6)  # six emotion classes
 
@@ -323,7 +317,7 @@ def main(
 
     # 3) model --------------------------------------------------------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = FCNN(dropout1=args.drop1, dropout2=args.drop2, red_rat=args.red_rat).to(
+    model = FCNN(dropout=args.drop, red_rat=args.red_rat).to(
         device
     )
     model.apply(xavier_init)
