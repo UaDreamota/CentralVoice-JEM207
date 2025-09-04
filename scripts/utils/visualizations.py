@@ -1,16 +1,22 @@
 # scripts/utils/vizualizations.py
 
 # ─────────────────────────────────────────────────────────────
-# Visualization helpers for data and metrics 
+### VISUALIZATION HELPERS for data and metrics 
 # ─────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 import torch
 
 from pathlib import Path
+from typing import Sequence, Optional
+import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
-from torchmetrics import ConfusionMatrix
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+
+import torch 
+from torchmetrics.classification import ConfusionMatrix
 
 # ─────────────────────────────────────────────────────────────
 # plot_class_distribution
@@ -130,145 +136,203 @@ def plot_class_distribution(
 
     return out_paths
 
+# ─────────────────────────────────────────────────────────────
+# plot_training_history
+# ─────────────────────────────────────────────────────────────
+
 def plot_training_history(
     history_csv: Path,
     outdir: Path,
     *,
     title_prefix: str | None = None,
 ) -> dict[str, Path]:
-    """Visualize train and dev loss, accuracy and macro F1 over epochs.
-    The CSV file is expected to be in long format with the following columns::
-        epoch, split, loss, acc, macro_f1, lr, wall_time
-    Parameters
-    ----------
-    history_csv:
-        Path to the CSV file produced during training.
-    outdir:
-        Directory where the figures will be saved.
-    title_prefix:
-        Prefix for each figure title.
-    Returns
-    -------
-    dict[str, Path]
-        Mapping from metric name (``loss``, ``accuracy``, ``macro_f1``)
-        to the path of the saved PNG figure.
-    Notes
-    -----
-    - Early stopping epoch is assumed to be the final epoch recorded.
-    - The best dev accuracy is highlighted on the accuracy plot.
-    - The model name is inferred from ``history_csv``'s parent directory and
-      included in figure titles and filenames.
-    """
+    """Visualize train & dev loss/accuracy/macro F1 over epochs with integer x-axis."""
     df = pd.read_csv(history_csv)
     outdir.mkdir(parents=True, exist_ok=True)
+
     model_name = history_csv.parent.parent.stem
     if title_prefix is None:
-        title_prefix = f"{model_name} training history"
+        title_prefix = model_name
+
     required_cols = {"epoch", "split", "loss", "acc", "macro_f1"}
     missing = required_cols - set(df.columns)
     if missing:
-        raise ValueError(
-            f"Missing columns {missing} in {history_csv}."
-        )
+        raise ValueError(f"Missing columns {missing} in {history_csv}.")
+
     train_df = df[df["split"] == "train"].sort_values("epoch")
-    dev_df = df[df["split"] == "dev"].sort_values("epoch")
+    dev_df   = df[df["split"] == "dev"].sort_values("epoch")
+
+    # epochs for integer ticks/limits
+    epochs = np.sort(df["epoch"].unique().astype(int))
     early_stop_epoch = int(df["epoch"].max())
-    best_dev_idx = dev_df["acc"].idxmax()
-    best_dev_epoch = int(dev_df.loc[best_dev_idx, "epoch"])
-    best_dev_value = float(dev_df.loc[best_dev_idx, "acc"])
+
     out_paths: dict[str, Path] = {}
+
     def _plot(col: str, ylabel: str) -> None:
         fig, ax = plt.subplots(figsize=(9, 5))
         ax.plot(train_df["epoch"], train_df[col], label="train")
-        ax.plot(dev_df["epoch"], dev_df[col], label="dev")
-        ax.axvline(early_stop_epoch, color="red", linestyle="--", label="early stop")
-        ax.axvline(best_dev_epoch, color="green", linestyle=":", label="best dev acc")
-        if col == "acc":
-            ax.scatter([best_dev_epoch], [best_dev_value], color="green", zorder=5)
+        ax.plot(dev_df["epoch"],   dev_df[col],   label="dev")
+
+        # choose best dev point per metric (loss=min, others=max)
+        if col == "loss":
+            idx = dev_df[col].idxmin()
+        else:
+            idx = dev_df[col].idxmax()
+        best_epoch = int(dev_df.loc[idx, "epoch"])
+        best_value = float(dev_df.loc[idx, col])
+
+        # vertical markers
+        ax.axvline(early_stop_epoch, color="red",   linestyle="--", label="early stop")
+        ax.axvline(best_epoch,       color="green", linestyle=":",  label=f"best valiation {ylabel.lower()}")
+
+        # green dot at best dev point
+        ax.scatter([best_epoch], [best_value], color="green", zorder=5)
+
+        # axis labels/title
         ax.set_xlabel("Epoch")
         ax.set_ylabel(ylabel)
         ax.set_title(f"{title_prefix} – {ylabel}")
+
+        # integer ticks on x-axis
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        if epochs.size == 1:
+            ax.set_xlim(epochs[0] - 0.5, epochs[0] + 0.5)
+            ax.set_xticks([int(epochs[0])])
+        else:
+            ax.set_xlim(epochs.min() - 0.5, epochs.max() + 0.5)
+            ax.set_xticks(epochs)
+
+        ax.grid(True, alpha=0.3)
         ax.legend()
-        ax.grid(True)
         fig.tight_layout()
-        filename = f"{model_name}_training_history_{col}.png"
+
+        filename = f"{model_name}_{col}.png"
         out_path = outdir / filename
         fig.savefig(out_path, dpi=300)
         plt.close(fig)
         out_paths[col] = out_path
+
     _plot("loss", "Loss")
     _plot("acc", "Accuracy")
     _plot("macro_f1", "Macro F1")
 
     return out_paths
 
+
+# ─────────────────────────────────────────────────────────────
+# plot_confusion_matrix
+# ─────────────────────────────────────────────────────────────
+
 def plot_confusion_matrix(
     outdir: Path,
     predictions: torch.Tensor,
     labels: torch.Tensor,
     *,
-    model_name: str | None = None,
+    model_name: Optional[str] = None,
+    # x-axis (predicted) class order stays fixed by default
+    pred_names: Sequence[str] = ("ANG", "DIS", "FEA", "HAP", "NEU", "SAD"),
+    # y-axis (true) class order: set to None to mirror pred_names,
+    # or pass a different order, or set reverse_true=True to invert it.
+    true_names: Optional[Sequence[str]] = None,
+    reverse_true: bool = False,
+    hspace: float = 0.45,   # extra space between heatmap and recall bars
 ) -> Path:
-    """Plot a 6-class confusion matrix from prediction CSV.
-    The CSV is expected to contain a ``prediction`` column with integer labels
-    corresponding to the CREMA-D emotions.
-    Parameters
-    ----------
-    outdir:
-        Directory where the confusion matrix figure will be saved.
-    predictions:
-        Tensor of predicted class indices or logits/probabilities (N or N×C).
-    labels:
-        Tensor of true class indices (N).
-    model_name:
-        Model name that was trained. 
-    Returns
-    -------
-    Path
-        Path to the saved PNG image.
     """
-    predictions = torch.as_tensor(predictions)
-    labels = torch.as_tensor(labels)
+    Row-normalized confusion matrix (%) with a per-class recall (accuracy) strip.
 
-    # If predictions are logits/probabilities (N×C), reduce to argmax
-    if predictions.ndim > 1:
-        predictions = predictions.argmax(dim=1)
-    if labels.ndim > 1:
-        labels = labels.argmax(dim=1)
+    - You can reverse or customize the TRUE-label (y-axis) order independently
+      of the PREDICTED (x-axis) order.
+    - Set reverse_true=True to flip the y-axis (e.g., ANG at bottom).
+    """
+    outdir.mkdir(parents=True, exist_ok=True)
 
-    cm_metric = ConfusionMatrix(task="multiclass", num_classes=6)
-    cm = cm_metric(predictions, labels).numpy()
+    preds = torch.as_tensor(predictions)
+    targs = torch.as_tensor(labels)
+    if preds.ndim > 1:
+        preds = preds.argmax(dim=1)
+    if targs.ndim > 1:
+        targs = targs.argmax(dim=1)
 
-    slug = str(model_name).replace(" ", "_")
-    classes = ["ANG", "DIS", "FEA", "HAP", "NEU", "SAD"]
-    fig, ax = plt.subplots(figsize=(7, 6))
-    im = ax.imshow(cm, cmap="Blues")
-    fig.colorbar(im, ax=ax)
-    ax.set_xticks(range(len(classes)))
-    ax.set_yticks(range(len(classes)))
-    ax.set_xticklabels(classes, rotation=45, ha="right")
-    ax.set_yticklabels(classes)
-    ax.set_xlabel("Predicted label")
-    ax.set_ylabel("True label")
-    ax.set_title(model_name)
-    thresh = cm.max() / 2.0 if cm.max() > 0 else 0
-    for i in range(cm.shape[0]):
-        for j in range(cm.shape[1]):
+    num_classes = len(pred_names)
+    if true_names is None:
+        true_names = list(pred_names)
+    if reverse_true:
+        true_names = list(true_names)[::-1]
+
+    # Raw counts CM in index order 0..C-1
+    cm_raw = ConfusionMatrix(task="multiclass", num_classes=num_classes)(preds, targs).cpu().numpy()
+
+    # Row-normalize (true-label normalization)
+    row_sums = cm_raw.sum(axis=1, keepdims=True)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        cm_norm = np.where(row_sums > 0, cm_raw / row_sums, 0.0)  # shape (C, C); rows=true, cols=pred
+
+    # Build index maps for display:
+    # columns (predicted) follow pred_names -> indices 0..C-1 (assumes label ids align with pred_names order)
+    col_idx = [pred_names.index(nm) for nm in pred_names]  # usually [0..C-1]
+    # rows (true) follow true_names (can be reversed or custom)
+    row_idx = [pred_names.index(nm) for nm in true_names]  # map names to original row indices
+
+    # Reorder for display
+    cm_disp = cm_norm[np.ix_(row_idx, col_idx)]
+
+    # Per-class recall values in the TRUE order chosen for display
+    # Recall for class 'nm' is cm_norm[idx, idx] where idx is its original index in pred_names
+    per_class_recall = np.array([cm_norm[pred_names.index(nm), pred_names.index(nm)] for nm in true_names])
+
+    # ----- Figure: heatmap + recall bar strip -----
+    fig = plt.figure(figsize=(9, 8))
+    gs = fig.add_gridspec(nrows=2, ncols=1, height_ratios=[12, 2.4], hspace=hspace)
+    ax = fig.add_subplot(gs[0])
+    ax_bar = fig.add_subplot(gs[1], sharex=ax)
+
+    im = ax.imshow(cm_disp * 100.0, cmap="Blues", vmin=0, vmax=100)
+    cbar = fig.colorbar(im, ax=ax)
+    cbar.set_label("Row-normalized (%)", rotation=90)
+
+    # Ticks and labels
+    ax.set_xticks(np.arange(num_classes))
+    ax.set_yticks(np.arange(num_classes))
+    ax.set_xticklabels(pred_names, rotation=45, ha="right")
+    ax.set_yticklabels(true_names)
+    ax.set_xlabel("Predicted emotions")
+    ax.set_ylabel("True emotions")
+    if model_name:
+        ax.set_title(model_name)
+
+    # Annotate cells with percentages
+    thresh = (cm_disp.max() * 100.0) / 2.0 if cm_disp.size else 0
+    for i in range(num_classes):
+        for j in range(num_classes):
+            val = cm_disp[i, j] * 100.0
             ax.text(
-                j,
-                i,
-                int(cm[i, j]),
-                ha="center",
-                va="center",
-                color="white" if cm[i, j] > thresh else "black",
-                fontsize=8,
+                j, i, f"{val:.0f}%",
+                ha="center", va="center",
+                color="white" if val > thresh else "black",
+                fontsize=9,
             )
-    fig.tight_layout()
+
+    # Recall bars (aligned with x-axis / predicted classes? We align to TRUE order below the heatmap)
+    x = np.arange(num_classes)
+    bars = ax_bar.bar(x, per_class_recall, width=0.7, color="#2b7bbb", alpha=0.85)
+    ax_bar.set_ylim(0, 1)
+    ax_bar.set_ylabel("Recall")
+    ax_bar.set_xlabel("Predicted label")  # optional; remove if redundant
+    ax_bar.grid(axis="y", alpha=0.25)
+
+    # Put percentages above bars
+    for i, b in enumerate(bars):
+        h = b.get_height()
+        ax_bar.text(b.get_x() + b.get_width() / 2, h + 0.02, f"{h*100:.0f}%", ha="center", va="bottom", fontsize=8)
+
+    # Match x tick labels with TRUE order on the bar strip (we keep them on the heatmap only)
+    plt.setp(ax_bar.get_xticklabels(), visible=False)
+
+    # Save
+    slug = (model_name or "model").replace(" ", "_")
     out_path = outdir / f"{slug}_confusion_matrix.png"
+    fig.tight_layout()
     fig.savefig(out_path, dpi=300)
     plt.close(fig)
     
     return out_path
-
-
-

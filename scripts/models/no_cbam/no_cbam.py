@@ -146,15 +146,11 @@ class FCNN(nn.Module):
 
         # (i) Classifier head
         self.flatten = nn.Flatten()  # → 128·4·4 = 2048
-        self.fc1 = nn.Linear(2048, 256, bias=True)
-        self.relu1 = nn.ReLU(inplace=True)
-        self.drop1 = nn.Dropout(p=dropout1)
+        self.fc = nn.Linear(2048, 256, bias=True)
+        self.relu = nn.ReLU(inplace=True)
+        self.drop = nn.Dropout(p=dropout1)
 
-        self.fc2 = nn.Linear(256, 256, bias=True)
-        self.relu2 = nn.ReLU(inplace=True)
-        self.drop2 = nn.Dropout(p=dropout2)
-
-        self.fc3 = nn.Linear(256, 6)  # six emotion classes
+        self.class_l = nn.Linear(256, 6)  # six emotion classes
 
     # ----------------- FORWARD PASS --------------------------
     def forward(self, x):
@@ -174,10 +170,9 @@ class FCNN(nn.Module):
         x = self.conv4(x)  # (B,128, 4, 4)
 
         x = self.flatten(x)  # (B,2048)
-        x = self.drop1(self.relu1(self.fc1(x)))  # (B,256)
-        x = self.drop2(self.relu2(self.fc2(x)))  # (B,256)
+        x = self.drop(self.relu(self.fc(x)))  # (B,256)
 
-        logits = self.fc3(x)
+        logits = self.class_l(x)
 
         return logits
 
