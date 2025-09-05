@@ -47,6 +47,12 @@ parser.add_argument(
     type=float,
     help="Dropout rate in the 1st FC layer of the classification head.",
 )
+parser.add_argument(
+    "--patience",
+    default=10,
+    type=int,
+    help="Number of epochs the model waits until it stops training.",
+)
 
 
 ##### ───────────────────────────────────────────────────────────── FULLY CONVOLUTIONAL NETWORK WITH CBAM ─────────────────────────────────────────────────────────────
@@ -332,7 +338,7 @@ def main(
 
     # 4) training loop ------------------------------------------------------
     best_dev_acc = 0.0
-    patience_counter, patience = 0, 5
+    patience_counter, patience = 0, args.patience
     for epoch in range(1, args.epochs + 1):
 
         t0 = time()
