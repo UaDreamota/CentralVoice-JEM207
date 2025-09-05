@@ -403,8 +403,9 @@ def create_dataloaders(
         train_transform=None,
         dev_transform=dev_transform
     )
-    num_workers = 4
-    pin_memory = False
+    
+    num_workers = 0 if torch.cuda.is_available() else 4
+    pin_memory = True if torch.cuda.is_available() else False
     persistent_workers = True if num_workers > 0 else False
     # 3. Wrap each in a DataLoader
     train_dl = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent_workers)

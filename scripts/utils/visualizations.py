@@ -229,20 +229,17 @@ def plot_confusion_matrix(
     labels: torch.Tensor,
     *,
     model_name: Optional[str] = None,
-    # x-axis (predicted) class order stays fixed by default
     pred_names: Sequence[str] = ("ANG", "DIS", "FEA", "HAP", "NEU", "SAD"),
-    # y-axis (true) class order: set to None to mirror pred_names,
-    # or pass a different order, or set reverse_true=True to invert it.
     true_names: Optional[Sequence[str]] = None,
     reverse_true: bool = False,
-    hspace: float = 0.45,   # extra space between heatmap and recall bars
+    hspace: float = 0.6,  
 ) -> Path:
     """
-    Row-normalized confusion matrix (%) with a per-class recall (accuracy) strip.
+    Row-normalized confusion matrix (%) + per-class recall bar strip (TRUE order).
 
-    - You can reverse or customize the TRUE-label (y-axis) order independently
-      of the PREDICTED (x-axis) order.
-    - Set reverse_true=True to flip the y-axis (e.g., ANG at bottom).
+    - x-axis (top heatmap) shows PREDICTED labels (pred_names).
+    - y-axis (heatmap) and the bar chart below use TRUE labels (true_names),
+      optionally reversed with reverse_true=True.
     """
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -259,38 +256,34 @@ def plot_confusion_matrix(
     if reverse_true:
         true_names = list(true_names)[::-1]
 
-    # Raw counts CM in index order 0..C-1
+    # 1) Raw CM (counts) in canonical index order 0..C-1
     cm_raw = ConfusionMatrix(task="multiclass", num_classes=num_classes)(preds, targs).cpu().numpy()
 
-    # Row-normalize (true-label normalization)
+    # 2) Row-normalize (true-label normalization)
     row_sums = cm_raw.sum(axis=1, keepdims=True)
     with np.errstate(invalid="ignore", divide="ignore"):
-        cm_norm = np.where(row_sums > 0, cm_raw / row_sums, 0.0)  # shape (C, C); rows=true, cols=pred
+        cm_norm = np.where(row_sums > 0, cm_raw / row_sums, 0.0)  # rows=true, cols=pred
 
-    # Build index maps for display:
-    # columns (predicted) follow pred_names -> indices 0..C-1 (assumes label ids align with pred_names order)
-    col_idx = [pred_names.index(nm) for nm in pred_names]  # usually [0..C-1]
-    # rows (true) follow true_names (can be reversed or custom)
-    row_idx = [pred_names.index(nm) for nm in true_names]  # map names to original row indices
-
-    # Reorder for display
+    # 3) Reorder for display
+    col_idx = [pred_names.index(nm) for nm in pred_names]              # predicted order (usually 0..C-1)
+    row_idx = [pred_names.index(nm) for nm in true_names]              # true order (custom/reversed ok)
     cm_disp = cm_norm[np.ix_(row_idx, col_idx)]
 
-    # Per-class recall values in the TRUE order chosen for display
-    # Recall for class 'nm' is cm_norm[idx, idx] where idx is its original index in pred_names
+    # Per-class recall (TRUE order chosen for display)
     per_class_recall = np.array([cm_norm[pred_names.index(nm), pred_names.index(nm)] for nm in true_names])
 
-    # ----- Figure: heatmap + recall bar strip -----
-    fig = plt.figure(figsize=(9, 8))
-    gs = fig.add_gridspec(nrows=2, ncols=1, height_ratios=[12, 2.4], hspace=hspace)
+    # ---- Figure: heatmap + recall bars ----
+    fig = plt.figure(figsize=(10, 9))
+    gs = fig.add_gridspec(nrows=2, ncols=1, height_ratios=[12, 2.6], hspace=hspace)
     ax = fig.add_subplot(gs[0])
+    # sharex keeps bar alignment with columns; we will override tick labels below
     ax_bar = fig.add_subplot(gs[1], sharex=ax)
 
     im = ax.imshow(cm_disp * 100.0, cmap="Blues", vmin=0, vmax=100)
     cbar = fig.colorbar(im, ax=ax)
     cbar.set_label("Row-normalized (%)", rotation=90)
 
-    # Ticks and labels
+    # Heatmap ticks/labels
     ax.set_xticks(np.arange(num_classes))
     ax.set_yticks(np.arange(num_classes))
     ax.set_xticklabels(pred_names, rotation=45, ha="right")
@@ -300,39 +293,38 @@ def plot_confusion_matrix(
     if model_name:
         ax.set_title(model_name)
 
-    # Annotate cells with percentages
-    thresh = (cm_disp.max() * 100.0) / 2.0 if cm_disp.size else 0
+    # Cell annotations; WHITE text only when cell value >= 50%
+    fixed_thresh = 50.0
     for i in range(num_classes):
         for j in range(num_classes):
-            val = cm_disp[i, j] * 100.0
+            val_pct = cm_disp[i, j] * 100.0
             ax.text(
-                j, i, f"{val:.0f}%",
+                j, i, f"{val_pct:.0f}%",
                 ha="center", va="center",
-                color="white" if val > thresh else "black",
+                color="white" if val_pct >= fixed_thresh else "black",
                 fontsize=9,
             )
 
-    # Recall bars (aligned with x-axis / predicted classes? We align to TRUE order below the heatmap)
+    # Recall bars (TRUE order on x-axis)
     x = np.arange(num_classes)
     bars = ax_bar.bar(x, per_class_recall, width=0.7, color="#2b7bbb", alpha=0.85)
     ax_bar.set_ylim(0, 1)
     ax_bar.set_ylabel("Recall")
-    ax_bar.set_xlabel("Predicted label")  # optional; remove if redundant
+
+    # Show emotion labels on the bar chart's x-axis (TRUE order)
+    ax_bar.set_xticks(x)
+    ax_bar.set_xticklabels(true_names, rotation=0)  # rotate if you want
+    ax_bar.set_xlabel("True label")
     ax_bar.grid(axis="y", alpha=0.25)
 
-    # Put percentages above bars
-    for i, b in enumerate(bars):
+    # Annotate bars with percentages
+    for b in bars:
         h = b.get_height()
-        ax_bar.text(b.get_x() + b.get_width() / 2, h + 0.02, f"{h*100:.0f}%", ha="center", va="bottom", fontsize=8)
+        ax_bar.text(b.get_x() + b.get_width()/2, h + 0.02, f"{h*100:.0f}%", ha="center", va="bottom", fontsize=8)
 
-    # Match x tick labels with TRUE order on the bar strip (we keep them on the heatmap only)
-    plt.setp(ax_bar.get_xticklabels(), visible=False)
-
-    # Save
     slug = (model_name or "model").replace(" ", "_")
     out_path = outdir / f"{slug}_confusion_matrix.png"
-    fig.tight_layout()
     fig.savefig(out_path, dpi=300)
     plt.close(fig)
-    
+
     return out_path
