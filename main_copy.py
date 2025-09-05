@@ -17,7 +17,7 @@ import tarfile
 
 
 FOLDER_URL_DATA = "https://drive.google.com/drive/folders/1rWylF6dUeP2D8k39gMPGEUY4yBhyXGee?usp=sharing"
-FOLDER_URL_TEST = "https://drive.google.com/drive/folders/1-M4YQKUbNfAz-IZSGcSUguu7aqAa3AYf?usp=sharing"
+FOLDER_URL_CHECK = "https://drive.google.com/drive/folders/1-M4YQKUbNfAz-IZSGcSUguu7aqAa3AYf?usp=sharing"
 
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -377,7 +377,7 @@ def main() -> None:
     Steps
     -----
     1. Check for presence of audio data. Optionally download either the
-       full dataset or a small test subset, and record the choice in a
+       full dataset or a small **check** subset, and record the choice in a
        scope marker file.
     2. Extract archives (if any), generate MFCC features, and ensure labels.
     3. Optionally visualize class imbalance.
@@ -394,7 +394,9 @@ def main() -> None:
     # ─────────────────────────────────────────────────────────────
     # 1) Data downloading (tracking the data scope) 
     # ─────────────────────────────────────────────────────────────
-    data_scope = None  # 'full' | 'test' 
+    data_scope = None  # 'full' | 'check'
+
+    print("Loading dependencies… Please wait.")
 
     if not DATA_AUDIO_DIR.exists() or not any(DATA_AUDIO_DIR.iterdir()):
         print("Wait! Data is missing.")
@@ -403,18 +405,18 @@ def main() -> None:
         )
         if download_question == "y":
             test_data_question = (
-                input("Do you wish to download the full dataset or the test? [full/test]: ")
+                input("Do you wish to download the FULL dataset or the CHECK data? [full/check]: ")
                 .strip()
                 .lower()
             )
-            if test_data_question == "test":
-                print("Creating 50 file batches. This may take a while...")
-                download_data(FOLDER_URL_TEST, str(UNPROCESSED_ROOT))
+            if test_data_question == "check":
+                print("Creating file batches. This may take a while...")
+                download_data(FOLDER_URL_CHECK, str(UNPROCESSED_ROOT))
                 extract_archives(UNPROCESSED_ROOT)
-                _write_scope_marker("test")
-                data_scope = "test"
+                _write_scope_marker("check")
+                data_scope = "check"
             elif test_data_question == "full":
-                print("Creating 50 file batches. This may take a while...")
+                print("Creating file batches. This may take a while...")
                 download_data(FOLDER_URL_DATA, str(UNPROCESSED_ROOT))
                 extract_archives(UNPROCESSED_ROOT)
                 _write_scope_marker("full")
@@ -428,14 +430,14 @@ def main() -> None:
     else: 
         # Data exists; try to identify scope
         scope = _read_scope_marker()
-        if scope in {"full", "test"}:
+        if scope in {"full", "check"}:
             data_scope = scope
             print(f"Data already exists. Skipping download. (scope: {data_scope})")
         else:
             n_wavs = _count_audio_wavs()
             print(f"Data already exists. Skipping download. Detected {n_wavs} .wav files.")
             ask = input("Is this the FULL dataset? [y/n]: ").strip().lower()
-            data_scope = "full" if ask == "y" else "test"
+            data_scope = "full" if ask == "y" else "check"
             _write_scope_marker(data_scope)
 
     if not DATA_AUDIO_DIR.exists():
@@ -477,12 +479,6 @@ def main() -> None:
     
     training_question = input("Do you wish to train the model? [y/n]: ").strip().lower()
     if training_question == "y":
-        if data_scope == "test":
-            print(
-                "Training is disabled when only the TEST subset is present.\n"
-                "Please download the FULL dataset to enable training (re-run and choose 'full')."
-            )
-            return
 
         model_choice = input("Which models do you wish to train? [CBAM, NO_CBAM, baseline]: ").strip().lower()
         models = _parse_model_list(model_choice)
