@@ -79,18 +79,21 @@ def _count_audio_wavs() -> int:
 
 def _write_scope_marker(scope: str) -> None:
     """
-    Write a scope marker file indicating which subset is present.
+    Persist the data-scope marker that records whether the repository holds the
+    full dataset or the check subset.
 
     Parameters
     ----------
     scope : str
-        Data scope label to persist, typically ``'full'`` or ``'test'``.
+        One of {'full', 'check'} (case-insensitive). The legacy value 'test'
+        is accepted and mapped to 'check'.
 
     Notes
     -----
-    The marker is written to ``SCOPE_MARKER`` and used to infer whether
-    the repository contains the full dataset or a test subset on future runs.
-    Any I/O errors are caught and reported as warnings, without raising.
+    - Writes the canonical token ('full' or 'check') to SCOPE_MARKER.
+    - Creates parent directories as needed.
+    - On invalid input, logs a warning and does not modify the marker.
+    - Any I/O errors are caught and reported as warnings (no exception raised).
     """
     try:
         SCOPE_MARKER.parent.mkdir(parents=True, exist_ok=True)
