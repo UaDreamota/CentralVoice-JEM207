@@ -147,9 +147,13 @@ class FCNN(nn.Module):
 
         # (i) Classifier head
         self.flatten = nn.Flatten()  # → 128·4·4 = 2048
-        self.fc = nn.Linear(2048, 256, bias=True)
-        self.relu = nn.ReLU(inplace=True)
-        self.drop = nn.Dropout(p=dropout)
+        self.fc1 = nn.Linear(2048, 256, bias=True)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.drop1 = nn.Dropout(p=dropout)
+
+        self.fc2 = nn.Linear(256, 256, bias=True)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.drop2 = nn.Dropout(p=dropout)
 
         self.class_l = nn.Linear(256, 6)  # six emotion classes
 
@@ -171,7 +175,9 @@ class FCNN(nn.Module):
         x = self.conv4(x)  # (B,128, 4, 4)
 
         x = self.flatten(x)  # (B,2048)
-        x = self.drop(self.relu(self.fc(x)))  # (B,256)
+
+        x = self.drop1(self.relu1(self.fc1(x)))  # (B,256)
+        x = self.drop2(self.relu2(self.fc2(x)))  # (B,256)
 
         logits = self.class_l(x)
 
@@ -235,8 +241,8 @@ def main(args: argparse.Namespace) -> None:
     model.apply(xavier_init)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=args.epochs * len(train_dl), eta_min=args.lr * 0.01
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, factor=0.5, patience=4, min_lr=args.lr * 0.01
     )
     loss_fn = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
     macro_f1 = F1Score(task='multiclass', num_classes=6, average='macro').to(device)
@@ -262,7 +268,7 @@ def main(args: argparse.Namespace) -> None:
             loss = loss_fn(out, label)
             loss.backward()
             optimizer.step()
-            scheduler.step()
+
 
             epoch_loss += loss.item()
             batches += 1
@@ -295,6 +301,7 @@ def main(args: argparse.Namespace) -> None:
         dev_acc = correct / total if total else 0.0
         val_loss_mean = val_loss / val_batches
         dev_f1 = float(macro_f1.compute().item())
+        scheduler.step(val_loss_mean)
 
         wall = time() - t0
 
