@@ -5,6 +5,7 @@
 """
 
 import argparse
+import random
 import csv
 from pathlib import Path
 from typing import Optional, Tuple
@@ -159,190 +160,172 @@ class CremadPrecompDataset(Dataset):
 # ─────────────────────────────────────────────────────────────
 
 # ------------- Train transformation -------------------------------------------
+
 class TrainTransform:
     """
-    Transformation for training that expects input of shape (1, C, H_var, T_var)
-    and outputs a tensor of shape (1, C, 40, 218), with SpecAugment‐style
-    frequency & time masking.
+    Training transform for MFCC tensors shaped (1, C, 40, T_var) -> (1, C, 40, time_length).
+    Applies (in order): pad/truncate → *paper-style* augmentation (optional) →
+    local z-score normalization → SpecAugment (freq/time masking).
 
-    Parameters:
-    -----------
-    time_length : int
-        Desired time‐frame length (218).
+    Paper-style augmentation (feature-space approximation):
+      • One of {time-shift, white-noise} chosen uniformly per sample.
+      • Time-shift range: ±time_shift_ms (converted to frames via hop_ms).
+      • White noise strength: alpha ∈ [0, noise_abs_max] scaled by sample std.
 
-    freq_mask_param : int
-        Maximum number of consecutive frequency bins to mask (e.g., 15). 
-        Used by torchaudio.transforms.FrequencyMasking.
+    Args:
+      time_length (int): target number of time frames (default 218).
+      freq_mask_param (int): SpecAugment max masked freq bins (default 15).
+      time_mask_param (int): SpecAugment max masked time frames (default 25).
+      enable_paper_aug (bool): turn paper-style augmentation on/off (default True).
+      time_shift_ms (int): max absolute time-shift in milliseconds (default 350).
+      hop_ms (float): analysis hop in ms to convert ms→frames (default 16.0).
+      noise_abs_max (float): max white-noise factor in [0, 0.2] (default 0.2).
+      shift_mode (str): 'zero' (zero-fill the wrapped region) or 'roll' (circular).
+      p_aug (float): probability to apply augmentation to a given sample (default 1.0).
+      rng (random.Random | None): RNG for reproducibility.
 
-    time_mask_param : int
-        Maximum number of consecutive time frames to mask (e.g., 25). 
-        Used by torchaudio.transforms.TimeMasking.
+    Returns:
+      torch.Tensor: (1, C, 40, time_length), float32.
     """
-    def __init__(self, time_length: int = 218,
+    def __init__(self,
+                 time_length: int = 218,
                  freq_mask_param: int = 15,
-                 time_mask_param: int = 25):
+                 time_mask_param: int = 25,
+                 *,
+                 enable_paper_aug: bool = True,
+                 time_shift_ms: int = 350,
+                 hop_ms: float = 16.0,
+                 noise_abs_max: float = 0.2,
+                 shift_mode: str = "zero",
+                 p_aug: float = 1.0,
+                 rng: Optional[random.Random] = None):
         self.time_length = time_length
-        # FrequencyMasking will zero out up to freq_mask_param consecutive rows
         self.freq_mask = FrequencyMasking(freq_mask_param=freq_mask_param)
-        # TimeMasking will zero out up to time_mask_param consecutive columns
         self.time_mask = TimeMasking(time_mask_param=time_mask_param)
 
+        self.enable_paper_aug = enable_paper_aug
+        self.frames_max = int(round(time_shift_ms / hop_ms))  # ≈ 22 for 350/16
+        self.noise_abs_max = float(noise_abs_max)
+        self.shift_mode = shift_mode
+        self.p_aug = float(p_aug)
+        self.rng = rng or random.Random()
+
+    def _time_shift_inplace(self, x: torch.Tensor, k: int) -> None:
+        """Shift along last dim by k frames; zero-fill the wrapped chunk if shift_mode == 'zero'."""
+        if k == 0:
+            return
+        T = x.shape[-1]
+        # roll first (cheap), then optionally zero the wrapped region
+        x.copy_(torch.roll(x, shifts=k, dims=-1))
+        if self.shift_mode == "zero":
+            if k > 0:
+                x[..., :k] = 0
+            else:
+                x[..., T + k:] = 0  # k is negative
+
+    def _white_noise_inplace(self, x: torch.Tensor, alpha: float) -> None:
+        """Add zero-mean Gaussian noise scaled by alpha * std(x)."""
+        if alpha <= 0:
+            return
+        std = x.std()
+        if torch.isfinite(std) and std > 0:
+            x.add_(torch.randn_like(x) * (alpha * std))
+
     def __call__(self, mfcc):
-        """
-        Apply padding/truncation, normalization, and masking.
-
-        Parameters:
-        -----------
-        mfcc : torch.Tensor or numpy.ndarray
-            Input MFCC tensor or array of shape (1, C, H_var, T_var).
-            - 1: “batch” dimension (always 1 here)
-            - C: number of channels (often 1 for a single MFCC “image”)
-            - H_var: number of MFCC coefficients (should be 40)
-            - T_var: variable time‐frames (to be padded/truncated to 218)
-
-        Returns:
-        --------
-        torch.Tensor
-            Output tensor of shape (1, C, 40, 218), dtype=torch.float,
-            normalized (zero mean, unit variance) and with random freq/time
-            masks applied (training‐only augmentation).
-        """
-        # 1. Ensure torch.Tensor type, cast to float if coming from NumPy
+        # 1) to torch.float32
         if not isinstance(mfcc, torch.Tensor):
             mfcc = torch.tensor(mfcc, dtype=torch.float)
-
-        # 2. Confirm we have exactly 4 dimensions
-        #    If someone accidentally passed shape (C, H, T), this will raise an error.
         if mfcc.ndim != 4:
-            raise ValueError(f"Expected 4D tensor (1, C, H_var, T_var), got shape {mfcc.shape}.")
-
-        # 3. Extract dimensions
-        #    B = batch size (should be 1)
-        #    C = channels (often 1 for MFCC)
-        #    H = height (number of MFCC bins, should be 40)
-        #    T = original time‐frames (variable)
+            raise ValueError(f"Expected 4D tensor (1, C, H_var, T_var), got {mfcc.shape}.")
         B, C, H, T = mfcc.shape
-
-        # 4. If H != 40, you may decide to raise an error (since H must be 40 here)
         if H != 40:
-            raise ValueError(f"Expected H=40 (MFCC bins), but got H={H}.")
+            raise ValueError(f"Expected H=40 (MFCC bins), got H={H}.")
 
-        # 5. Pad or truncate along the time axis (dimension index -1)
+        # 2) pad/truncate in time
         if T < self.time_length:
-            pad_amount = self.time_length - T
-            # F.pad with a 2‐element tuple (pad_left, pad_right) pads only last dimension.
-            # Here, pad=(0, pad_amount) → adds pad_amount zeros on the right side of the W dimension.
-            mfcc = F.pad(mfcc, (0, pad_amount))
-            # After padding, new shape is (1, C, 40, 218)
+            mfcc = F.pad(mfcc, (0, self.time_length - T))
         elif T > self.time_length:
-            # Truncate to the first `time_length` frames
             mfcc = mfcc[..., :self.time_length]
-            # After truncation, shape is (1, C, 40, 218)
 
-        # 6. Normalize per sample: compute mean and std over all values in the 4D tensor
-        #    (batch=1, so effectively over that single sample).
+        # 3) paper-style augmentation (feature-space), before normalization
+        if self.enable_paper_aug and self.rng.random() < self.p_aug:
+            # choose augmentation uniformly
+            if self.rng.random() < 0.5:
+                # time-shift: uniform integer in [-frames_max, frames_max]
+                k = self.rng.randint(-self.frames_max, self.frames_max)
+                if k != 0:
+                    for b in range(B):
+                        for c in range(C):
+                            self._time_shift_inplace(mfcc[b, c], k)
+            else:
+                # white noise: alpha ~ U(0, noise_abs_max)
+                alpha = self.rng.random() * self.noise_abs_max
+                self._white_noise_inplace(mfcc, alpha)
+
+        # 4) local z-score normalization (over all pixels of the MFCC image)
         mean = mfcc.mean()
         std = mfcc.std()
-        mfcc = (mfcc - mean) / (std + 1e-9)  # add epsilon to avoid division by zero
+        mfcc = (mfcc - mean) / (std + 1e-9)
 
-        # 7. Apply SpecAugment‐style masks on each (H, W) slice for every channel.
-        #    FrequencyMasking and TimeMasking from torchaudio expect a 2D or 3D
-        #    spectrogram: (freq, time) or (batch, freq, time). They do not natively
-        #    operate on a 4D tensor. Thus, we iterate over batch and channels.
+        # 5) SpecAugment masking (operate per [B, C] slice on 2D [40, T])
+        B, C, H, T = mfcc.shape
         for b in range(B):
             for c in range(C):
-                # Extract the (H, W) slice: shape (40, 218)
-                slice_2d = mfcc[b, c, :, :]
-                # 7a. Frequency masking: zero out up to freq_mask_param consecutive rows
-                slice_2d = self.freq_mask(slice_2d)
-                # 7b. Time masking: zero out up to time_mask_param consecutive columns
-                slice_2d = self.time_mask(slice_2d)
-                # Write back the masked slice
-                mfcc[b, c, :, :] = slice_2d
+                slice2d = mfcc[b, c, :, :]
+                slice2d = self.freq_mask(slice2d)
+                slice2d = self.time_mask(slice2d)
+                mfcc[b, c, :, :] = slice2d
 
         return mfcc
 
-# ------------- Dev transformation -------------------------------------------
+
 class DevTransform:
     """
-    Transformation for validation/dev that expects input of shape (1, C, H_var, T_var)
-    and outputs a tensor of shape (1, C, 40, 218), with only padding/truncation
-    and normalization—no speculative masking.
-
-    Parameters:
-    -----------
-    time_length : int
-        Desired time‐frame length (218).
+    Validation/Test transform: pad/truncate → local z-score normalization.
+    No augmentation applied.
     """
     def __init__(self, time_length: int = 218):
         self.time_length = time_length
 
     def __call__(self, mfcc):
-        """
-        Apply padding/truncation and normalization (no augmentation).
-
-        Parameters:
-        -----------
-        mfcc : torch.Tensor or numpy.ndarray
-            Input MFCC of shape (1, C, H_var, T_var).
-
-        Returns:
-        --------
-        torch.Tensor
-            Output tensor of shape (1, C, 40, 218), dtype=torch.float,
-            normalized (zero‐mean, unit‐variance).
-        """
-        # 1. Ensure torch.Tensor type
         if not isinstance(mfcc, torch.Tensor):
             mfcc = torch.tensor(mfcc, dtype=torch.float)
-
-        # 2. Confirm 4D shape
         if mfcc.ndim != 4:
-            raise ValueError(f"Expected 4D tensor (1, C, H_var, T_var), got shape {mfcc.shape}.")
+            raise ValueError(f"Expected 4D tensor (1, C, H_var, T_var), got {mfcc.shape}.")
 
         B, C, H, T = mfcc.shape
         if H != 40:
-            raise ValueError(f"Expected H=40 (MFCC bins), but got H={H}.")
+            raise ValueError(f"Expected H=40 (MFCC bins), got H={H}.")
 
-        # 3. Pad or truncate along the time axis
         if T < self.time_length:
-            pad_amount = self.time_length - T
-            mfcc = F.pad(mfcc, (0, pad_amount))
+            mfcc = F.pad(mfcc, (0, self.time_length - T))
         elif T > self.time_length:
             mfcc = mfcc[..., :self.time_length]
 
-        # 4. Normalize per sample
         mean = mfcc.mean()
         std = mfcc.std()
         mfcc = (mfcc - mean) / (std + 1e-9)
-
         return mfcc
+
+
+
+
     
 # ------------- Train transformation wrapper -------------------------------------------
 
 def get_train_transform(time_length: int = 218,
                         freq_mask_param: int = 15,
-                        time_mask_param: int = 25):
+                        time_mask_param: int = 25,
+                        **paper_aug_kwargs):
     """
-    Returns an instance of TrainTransform with the specified hyperparameters.
-
-    Args:
-    -----
-    time_length : int
-        Fixed number of time‐frames after padding/truncation (default: 218).
-    freq_mask_param : int
-        Maximum width of frequency‐axis mask (default: 15).
-    time_mask_param : int
-        Maximum width of time‐axis mask (default: 25).
-
-    Returns:
-    --------
-    TrainTransform
+    Factory for TrainTransform. Pass paper-style augmentation options via **paper_aug_kwargs.
+    Examples: enable_paper_aug=True, time_shift_ms=350, noise_abs_max=0.2, shift_mode='zero'.
     """
     return TrainTransform(
         time_length=time_length,
         freq_mask_param=freq_mask_param,
-        time_mask_param=time_mask_param
+        time_mask_param=time_mask_param,
+        **paper_aug_kwargs
     )
 
 # ------------- Dev transformation wrapper -------------------------------------------
