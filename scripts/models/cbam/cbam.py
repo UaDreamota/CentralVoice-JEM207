@@ -26,7 +26,7 @@ from scripts.utils.app_logging import setup_logging, CSVHistoryLogger
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=24, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=1, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument(
     "--threads", default=1, type=int, help="Maximum number of threads to use."
