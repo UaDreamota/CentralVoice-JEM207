@@ -151,10 +151,6 @@ class FCNN(nn.Module):
         self.relu1 = nn.ReLU(inplace=True)
         self.drop1 = nn.Dropout(p=dropout)
 
-        self.fc2 = nn.Linear(256, 256, bias=True)
-        self.relu2 = nn.ReLU(inplace=True)
-        self.drop2 = nn.Dropout(p=dropout)
-
         self.class_l = nn.Linear(256, 6)  # six emotion classes
 
     # ----------------- FORWARD PASS --------------------------
@@ -177,7 +173,6 @@ class FCNN(nn.Module):
         x = self.flatten(x)  # (B,2048)
 
         x = self.drop1(self.relu1(self.fc1(x)))  # (B,256)
-        x = self.drop2(self.relu2(self.fc2(x)))  # (B,256)
 
         logits = self.class_l(x)
 
