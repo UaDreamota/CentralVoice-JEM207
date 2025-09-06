@@ -26,11 +26,7 @@ from scripts.utils.app_logging import setup_logging, CSVHistoryLogger
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=24, type=int, help="Batch size.")
-<<<<<<< Updated upstream
 parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
-=======
-parser.add_argument("--epochs", default=50, type=int, help="Number of epochs.")
->>>>>>> Stashed changes
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument(
     "--threads", default=1, type=int, help="Maximum number of threads to use."
@@ -348,13 +344,8 @@ def main(
 
     # 4) training loop ------------------------------------------------------
     best_dev_acc = 0.0
-<<<<<<< Updated upstream
     patience_counter, patience = 0, args.patience
     for epoch in range(1, args.epochs + 1):
-=======
-    patience_counter, patience = 0, 50
-    for epoch in range(1, args.epochs):
->>>>>>> Stashed changes
 
         t0 = time()
         # Train phase -------------------------------------------------------
