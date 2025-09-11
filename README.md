@@ -1,9 +1,60 @@
-This is initial structure of the repository. 
+# Central Voice
 
-Things to be added: 
+![Banner]()
+[![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
+[![Dataset](https://img.shields.io/badge/dataset-CREMA--D-orange.svg)](https://github.com/CheyneyComputerScience/CREMA-D)
+[![Author 1](https://img.shields.io/badge/Arsenii%20Rybchenko-LinkedIn-pink?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/arsenii-rybchenko-841b38278/)
+[![Author 2](https://img.shields.io/badge/Mykyta%20Huskov-LinkedIn-green?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/mykytahuskov)
+---
+> End-to-end Speech Emotion Recognition*
+> From raw audio to trained models, developed for the JEM207 course.  
+> Current version classifies six emotions using the CREMA-D dataset.
+---
 
-- [ ] Data files
-- [ ] Papers for review 
-- [ ] Template for different documentation
-- [ ] First model (baseline solution)
-- [ ] Tensorboard
+##  Features
+- Automatic dataset download & preprocessing  
+-  Feature extraction (MFCCs, spectrograms)  
+-  Train/test/dev splits with reproducibility  
+-  Three CNN-based models (baseline & experimental)  
+-  Visualization of results (reports & confusion matrices) 
+---
+ ## Installation 
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/UaDreamota/CentralVoice-JEM207.git
+   cd CentralVoice-JEM207
+   ```
+2. **Create and activate a Python**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate   # on Linux/Mac
+   .venv\Scripts\activate      # on Windows
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+   
+## Usage
+
+main.py is the file that manages all parts of the script. It handles all the steps of the project.
+In order to start run main.py:
+
+```bash
+python main.py
+```
+
+Common workflows are documented in
+[docs/Running.md](docs/Running.md).
+
+## Project Structure
+```
+CentralVoice-JEM207/
+├── main.py              # Entry script (start here)
+├── scripts/
+│   ├── models/          # Baseline and experimental CNN models
+│   └── utils/           # Data download, logging, evaluation utilities
+├── docs/                # Usage and setup guides
+├── notebooks/           # Exploratory notebooks
+├── reports/             # Generated reports and figures
+└── requirements.txt
+```
