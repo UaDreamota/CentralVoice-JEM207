@@ -1,4 +1,9 @@
 # scripts/utils/data_downloader.py
+"""
+Script that handles the download from google drive
+"""
+
+
 import os
 import sys
 import json

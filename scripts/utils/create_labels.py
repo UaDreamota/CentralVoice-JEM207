@@ -1,3 +1,9 @@
+#utils/create_labels.py
+"""
+Script that handles labels and train/dev/test split
+"""
+
+
 import argparse
 import csv
 import os

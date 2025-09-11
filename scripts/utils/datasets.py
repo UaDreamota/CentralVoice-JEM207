@@ -1,7 +1,8 @@
 # scripts/utils/dataset.py
 
-"""Dataset utility for the CREMA-D speech-sentiment project
-   *using *pre-computed* MFCC feature matrices stored as .npy files*.
+"""
+Dataset utility for the CREMA-D speech-sentiment project
+*using *pre-computed* MFCC feature matrices stored as .npy files*.
 """
 
 import argparse

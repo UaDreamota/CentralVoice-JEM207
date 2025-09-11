@@ -1,8 +1,7 @@
 # scripts/utils/vizualizations.py
-
-# ─────────────────────────────────────────────────────────────
-### VISUALIZATION HELPERS for data and metrics 
-# ─────────────────────────────────────────────────────────────
+"""
+VISUALIZATION HELPERS for data and metrics
+"""
 
 from __future__ import annotations
 import torch

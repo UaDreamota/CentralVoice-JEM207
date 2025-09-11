@@ -1,4 +1,10 @@
 # utils/app_logging.py
+
+"""
+Utility functions and classes for setting up logging during training runs.
+"""
+
+
 from __future__ import annotations
 import os, sys, datetime, atexit
 
@@ -25,6 +31,17 @@ class _Tee:
                 pass
 
 def setup_logging(logdir: str, filename: str = "train.log") -> None:
+    """
+       Redirect stdout and stderr so that all console output is also written
+       to a log file in `logdir`.
+
+       Parameters
+       ----------
+       logdir : str
+           Directory where the log file will be stored. Created if missing.
+       filename : str, optional (default="train.log")
+           Name of the log file within `logdir`.
+    """
     os.makedirs(logdir, exist_ok=True)
     log_path = os.path.join(logdir, filename)
 
