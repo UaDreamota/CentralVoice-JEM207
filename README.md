@@ -1,12 +1,12 @@
 # Central Voice
 
-![Banner]()
+![Banner](/docs/banner.png)
 [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
 [![Dataset](https://img.shields.io/badge/dataset-CREMA--D-orange.svg)](https://github.com/CheyneyComputerScience/CREMA-D)
 [![Author 1](https://img.shields.io/badge/Arsenii%20Rybchenko-LinkedIn-pink?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/arsenii-rybchenko-841b38278/)
 [![Author 2](https://img.shields.io/badge/Mykyta%20Huskov-LinkedIn-green?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/mykytahuskov)
 ---
-> End-to-end Speech Emotion Recognition*
+> End-to-end Speech Emotion Recognition \
 > From raw audio to trained models, developed for the JEM207 course.  
 > Current version classifies six emotions using the CREMA-D dataset.
 ---
