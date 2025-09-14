@@ -9,9 +9,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+from sympy.printing.pytorch import torch
+
 from scripts.utils.data_downloader import download_data
-from scripts.utils.eval_pred import evaluate_predictions
+from scripts.utils.eval_pred import evaluate_predictions, CLASS_NAMES
 from scripts.utils.visualizations import plot_class_distribution, plot_training_history, plot_confusion_matrix
+from scripts.utils.audio_features import load_audio, extract_mfcc
+from scripts.utils.datasets import get_dev_transform
 import zipfile
 import tarfile
 
@@ -123,7 +127,58 @@ def _read_scope_marker() -> str | None:
         pass
     return None
 
+def _classify_audio_file(models: list[str], audio_path: str) -> None:
+    """Classify a single audio file to test the inference of out models."""
+    try:
+        signal, sr = load_audio(audio_path, sr=16000)
+    except Exception as exc:
+        print(f"Could not find file {audio_path}: {exc}")
+        return
+    duration = len(signal) / sr if sr else 0
+    if duration > 10:
+        print("Audio is too long. Please keep the audio under 10 seconds.")
+        return
+    feats = extract_mfcc(signal, sr)
+    transform = get_dev_transform()
+    feats_tensor = transform(feats)
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    for m in models:
+        try:
+            script_path = _resolve_model_script(m)
+            logs_root = script_path / "logs"
+            run_dir = _pick_logs_run_dir(logs_root)
+            ckpts = sorted(run_dir.glob("best_model_*.pt"))
+            if not ckpts:
+                print(f"No trained weights found for model {m} in {run_dir}.")
+                continue
+            ckpt_path = ckpts[-1]
+
+            if m == 'baseline':
+                from scripts.models.baseline.baseline import SimpleCNN
+                model = SimpleCNN()
+            elif m == "cbam":
+                from scripts.models.cbam.cbam import FCNN
+                model = FCNN()
+            elif m == "no_cbam":
+                from scripts.models.no_cbam.no_cbam import FCNN
+                model = FCNN()
+            else:
+                print(f"Unknown model {m}.")
+                continue
+            model.load_state_dict(torch.load(ckpt_path, map_location=device))
+            model.to(device)
+            model.eval()
+
+            with torch.no_grad():
+                inputs = feats_tensor.to(device)
+                outputs = model(inputs)
+                pred = int(outputs.argmax(dim=1).item())
+
+            print(f"Model {m} is classified as {pred}.")
+        except Exception as exc:
+            print(f'Failed to classify {m}: {exc}')
 # ─────────────────────────────────────────────────────────────
 ### EXCTRACTION (zip, features, labels)
 # ─────────────────────────────────────────────────────────────
@@ -560,7 +615,16 @@ def main() -> None:
                             print(f"   Could not open {p}: {exc}")
                 else:
                     print(f"No report images found for '{m}'. Please train the model first.")
-#
+
+        # ─────────────────────────────────────────────────────────────
+        # 5) Custom audio classification
+        # ─────────────────────────────────────────────────────────────
+        custom_question = input("Do you want to classify your own audio clip (<=10s)? [y/n]: ").strip().lower()
+        if custom_question == "y":
+            model_choice = input("Which models should classify the clip? [CBAM, NO_CBAM, baseline]: ").strip().lower()
+            models = _parse_model_list(model_choice)
+            audio_path = input("Path to WAV/MP3 file: ").strip()
+            _classify_audio_file(models, audio_path)
 
 
 if __name__ == "__main__":
