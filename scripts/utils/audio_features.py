@@ -3,7 +3,6 @@
 Script to extract audio features and all the attached helpers
 """
 
-
 import argparse
 import os
 from pathlib import Path
@@ -23,23 +22,43 @@ def load_audio(path: str, sr: int = 16000):
 def extract_mfcc(signal: np.ndarray, sr: int = 16000, *, n_mfcc: int = 40,
                   n_fft: int = 512, hop_length: int = 256,
                   window: str = "hann") -> np.ndarray:
-    """Compute log-MFCC features from a waveform.
+    """Compute MFCC features from a waveform.
 
-    Returns an array shaped (1, 1, coeff, frames) suitable for PyTorch models.
+    Pipeline:
+      1) Power mel-spectrogram (power=2.0)
+      2) Log scale (dB)
+      3) DCT to obtain MFCCs
+
+    Returns
+    -------
+    numpy.ndarray
+        Array shaped (1, 1, n_mfcc, frames), dtype float32.
     """
-    mfcc = librosa.feature.mfcc(
+    # 1) mel power spectrogram
+    S = librosa.feature.melspectrogram(
         y=signal,
         sr=sr,
-        n_mfcc=n_mfcc,
         n_fft=n_fft,
         hop_length=hop_length,
         window=window,
+        power=2.0,
+        n_mels=max(n_mfcc, 40),  # ensure enough mel bands for the DCT
     )
-    mfcc = librosa.power_to_db(mfcc, ref=np.max)
+    # 2) log scale (dB)
+    S_db = librosa.power_to_db(S, ref=np.max)
 
-    features = mfcc[np.newaxis, np.newaxis, :, :]
+    # 3) MFCCs from log-mel
+    mfcc = librosa.feature.mfcc(
+        S=S_db,
+        n_mfcc=n_mfcc,
+        dct_type=2,
+        norm="ortho",
+    )
+
+    features = mfcc[np.newaxis, np.newaxis, :, :].astype(np.float32, copy=False)
     assert features.shape[2] == n_mfcc, (
-        f"Expected {n_mfcc} coefficients, got {features.shape[2]}")
+        f"Expected {n_mfcc} coefficients, got {features.shape[2]}"
+    )
     return features
 
 
