@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from sympy.printing.pytorch import torch
+import torch
 
 from scripts.utils.data_downloader import download_data
 from scripts.utils.eval_pred import evaluate_predictions, CLASS_NAMES
@@ -550,6 +550,10 @@ def main() -> None:
                 print(f"Skipping '{m}'.")
                 continue
             train_model(model_script)
+            script_path = _resolve_model_script(m)
+            logs_root = script_path.parent / 'logs'
+            LOGS_DIR = _pick_logs_run_dir(logs_root)
+            _, _, _, _ = evaluate_predictions(log_dir=LOGS_DIR)
         
         results_question = input('Do you want to visualize training logs? [y/n]: ').strip().lower()
         if results_question == 'y':
@@ -578,7 +582,7 @@ def main() -> None:
                 except Exception as exc:
                     print(f"[visualization] Skipped history for '{m}' – {exc}")
                 try:
-                    _, _, predictions, labels = evaluate_predictions(log_dir=LOGS_DIR)
+                    _, _, predictions, labels = evaluate_predictions(log_dir=LOGS_DIR, verbose=False)
                     plot_confusion_matrix(OUT_DIR, predictions=predictions, labels=labels, model_name=m)
                 except Exception as exc:
                     print(f"[visualization] Skipped confusion matrix for '{m}' – {exc}")

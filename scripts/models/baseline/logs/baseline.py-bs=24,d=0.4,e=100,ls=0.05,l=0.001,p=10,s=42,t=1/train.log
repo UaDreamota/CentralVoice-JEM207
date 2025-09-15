@@ -1,0 +1,153 @@
+# Logging to D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\baseline\logs\baseline.py-bs=24,d=0.4,e=100,ls=0.05,l=0.001,p=10,s=42,t=1\train.log   (2025-09-15T13:18:32)
+Using device: cuda
+Logging training history to D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\baseline\logs\baseline.py-bs=24,d=0.4,e=100,ls=0.05,l=0.001,p=10,s=42,t=1\history.csv
+Epoch 1: 
+ train_loss 1.6799, train_acc 0.3009, train_f1 0.2841 
+dev_loss 1.6745, dev_acc 0.2997, dev_f1 0.2149, lr 0.001000
+Epoch 2: 
+ train_loss 1.6055, train_acc 0.3422, train_f1 0.3096 
+dev_loss 1.5641, dev_acc 0.3642, dev_f1 0.3158, lr 0.001000
+Epoch 3: 
+ train_loss 1.5819, train_acc 0.3570, train_f1 0.3226 
+dev_loss 1.5344, dev_acc 0.3763, dev_f1 0.3226, lr 0.001000
+Epoch 4: 
+ train_loss 1.5796, train_acc 0.3587, train_f1 0.3278 
+dev_loss 1.6521, dev_acc 0.3132, dev_f1 0.2605, lr 0.001000
+Epoch 5: 
+ train_loss 1.5642, train_acc 0.3614, train_f1 0.3265 
+dev_loss 1.5264, dev_acc 0.3898, dev_f1 0.3528, lr 0.001000
+Epoch 6: 
+ train_loss 1.5529, train_acc 0.3704, train_f1 0.3431 
+dev_loss 1.6491, dev_acc 0.3360, dev_f1 0.2896, lr 0.001000
+Epoch 7: 
+ train_loss 1.5445, train_acc 0.3824, train_f1 0.3524 
+dev_loss 1.5143, dev_acc 0.3871, dev_f1 0.3415, lr 0.001000
+Epoch 8: 
+ train_loss 1.5479, train_acc 0.3723, train_f1 0.3455 
+dev_loss 1.5607, dev_acc 0.3723, dev_f1 0.3190, lr 0.001000
+Epoch 9: 
+ train_loss 1.5347, train_acc 0.3859, train_f1 0.3599 
+dev_loss 1.7363, dev_acc 0.3293, dev_f1 0.2884, lr 0.001000
+Epoch 10: 
+ train_loss 1.5383, train_acc 0.3788, train_f1 0.3532 
+dev_loss 1.6388, dev_acc 0.3454, dev_f1 0.3061, lr 0.001000
+Epoch 11: 
+ train_loss 1.5367, train_acc 0.3812, train_f1 0.3592 
+dev_loss 1.4806, dev_acc 0.4234, dev_f1 0.3849, lr 0.001000
+Epoch 12: 
+ train_loss 1.5359, train_acc 0.3830, train_f1 0.3597 
+dev_loss 1.4765, dev_acc 0.3965, dev_f1 0.3665, lr 0.001000
+Epoch 13: 
+ train_loss 1.5266, train_acc 0.3839, train_f1 0.3632 
+dev_loss 1.5228, dev_acc 0.3871, dev_f1 0.3578, lr 0.001000
+Epoch 14: 
+ train_loss 1.5195, train_acc 0.3877, train_f1 0.3689 
+dev_loss 1.5496, dev_acc 0.3669, dev_f1 0.3291, lr 0.001000
+Epoch 15: 
+ train_loss 1.5125, train_acc 0.4054, train_f1 0.3868 
+dev_loss 1.4776, dev_acc 0.4005, dev_f1 0.3773, lr 0.001000
+Epoch 16: 
+ train_loss 1.5098, train_acc 0.3980, train_f1 0.3796 
+dev_loss 1.4731, dev_acc 0.4099, dev_f1 0.3840, lr 0.001000
+Epoch 17: 
+ train_loss 1.5084, train_acc 0.4005, train_f1 0.3845 
+dev_loss 1.5742, dev_acc 0.3683, dev_f1 0.3053, lr 0.001000
+Epoch 18: 
+ train_loss 1.5130, train_acc 0.4032, train_f1 0.3829 
+dev_loss 1.5106, dev_acc 0.4194, dev_f1 0.3951, lr 0.001000
+Epoch 19: 
+ train_loss 1.5057, train_acc 0.3924, train_f1 0.3751 
+dev_loss 1.4550, dev_acc 0.4234, dev_f1 0.4119, lr 0.001000
+Epoch 20: 
+ train_loss 1.5067, train_acc 0.4057, train_f1 0.3899 
+dev_loss 1.5794, dev_acc 0.3763, dev_f1 0.3425, lr 0.001000
+Epoch 21: 
+ train_loss 1.4878, train_acc 0.4143, train_f1 0.3996 
+dev_loss 1.4366, dev_acc 0.4261, dev_f1 0.4027, lr 0.001000
+Epoch 22: 
+ train_loss 1.4844, train_acc 0.4138, train_f1 0.3990 
+dev_loss 1.4545, dev_acc 0.4395, dev_f1 0.4307, lr 0.001000
+Epoch 23: 
+ train_loss 1.4849, train_acc 0.4193, train_f1 0.4072 
+dev_loss 1.4594, dev_acc 0.4220, dev_f1 0.4113, lr 0.001000
+Epoch 24: 
+ train_loss 1.4793, train_acc 0.4171, train_f1 0.4028 
+dev_loss 1.4385, dev_acc 0.4341, dev_f1 0.4122, lr 0.001000
+Epoch 25: 
+ train_loss 1.4707, train_acc 0.4181, train_f1 0.4038 
+dev_loss 1.5179, dev_acc 0.3938, dev_f1 0.3657, lr 0.001000
+Epoch 26: 
+ train_loss 1.4714, train_acc 0.4205, train_f1 0.4110 
+dev_loss 1.4227, dev_acc 0.4382, dev_f1 0.4202, lr 0.001000
+Epoch 27: 
+ train_loss 1.4735, train_acc 0.4170, train_f1 0.4060 
+dev_loss 1.4650, dev_acc 0.4086, dev_f1 0.3894, lr 0.001000
+Epoch 28: 
+ train_loss 1.4630, train_acc 0.4238, train_f1 0.4123 
+dev_loss 1.4498, dev_acc 0.4301, dev_f1 0.4049, lr 0.001000
+Epoch 29: 
+ train_loss 1.4655, train_acc 0.4238, train_f1 0.4150 
+dev_loss 1.4494, dev_acc 0.4449, dev_f1 0.4338, lr 0.001000
+Epoch 30: 
+ train_loss 1.4641, train_acc 0.4322, train_f1 0.4243 
+dev_loss 1.4705, dev_acc 0.4288, dev_f1 0.3973, lr 0.001000
+Epoch 31: 
+ train_loss 1.4539, train_acc 0.4243, train_f1 0.4158 
+dev_loss 1.5151, dev_acc 0.3831, dev_f1 0.3458, lr 0.000500
+Epoch 32: 
+ train_loss 1.4367, train_acc 0.4425, train_f1 0.4330 
+dev_loss 1.4768, dev_acc 0.4180, dev_f1 0.3930, lr 0.000500
+Epoch 33: 
+ train_loss 1.4244, train_acc 0.4474, train_f1 0.4384 
+dev_loss 1.3885, dev_acc 0.4543, dev_f1 0.4511, lr 0.000500
+Epoch 34: 
+ train_loss 1.4269, train_acc 0.4558, train_f1 0.4476 
+dev_loss 1.4595, dev_acc 0.4234, dev_f1 0.4109, lr 0.000500
+Epoch 35: 
+ train_loss 1.4149, train_acc 0.4554, train_f1 0.4488 
+dev_loss 1.4363, dev_acc 0.4274, dev_f1 0.3980, lr 0.000500
+Epoch 36: 
+ train_loss 1.4176, train_acc 0.4504, train_f1 0.4429 
+dev_loss 1.3933, dev_acc 0.4597, dev_f1 0.4499, lr 0.000500
+Epoch 37: 
+ train_loss 1.4111, train_acc 0.4494, train_f1 0.4405 
+dev_loss 1.4073, dev_acc 0.4583, dev_f1 0.4407, lr 0.000500
+Epoch 38: 
+ train_loss 1.4065, train_acc 0.4594, train_f1 0.4519 
+dev_loss 1.4397, dev_acc 0.4274, dev_f1 0.4133, lr 0.000250
+Epoch 39: 
+ train_loss 1.3915, train_acc 0.4665, train_f1 0.4605 
+dev_loss 1.3930, dev_acc 0.4543, dev_f1 0.4510, lr 0.000250
+Epoch 40: 
+ train_loss 1.3861, train_acc 0.4673, train_f1 0.4621 
+dev_loss 1.3838, dev_acc 0.4785, dev_f1 0.4647, lr 0.000250
+Epoch 41: 
+ train_loss 1.3916, train_acc 0.4660, train_f1 0.4575 
+dev_loss 1.3858, dev_acc 0.4556, dev_f1 0.4479, lr 0.000250
+Epoch 42: 
+ train_loss 1.3872, train_acc 0.4744, train_f1 0.4656 
+dev_loss 1.4063, dev_acc 0.4315, dev_f1 0.4146, lr 0.000250
+Epoch 43: 
+ train_loss 1.3942, train_acc 0.4670, train_f1 0.4616 
+dev_loss 1.4345, dev_acc 0.4288, dev_f1 0.4142, lr 0.000250
+Epoch 44: 
+ train_loss 1.3809, train_acc 0.4759, train_f1 0.4695 
+dev_loss 1.3988, dev_acc 0.4583, dev_f1 0.4521, lr 0.000250
+Epoch 45: 
+ train_loss 1.3770, train_acc 0.4747, train_f1 0.4687 
+dev_loss 1.3932, dev_acc 0.4382, dev_f1 0.4281, lr 0.000125
+Epoch 46: 
+ train_loss 1.3669, train_acc 0.4771, train_f1 0.4706 
+dev_loss 1.3750, dev_acc 0.4677, dev_f1 0.4636, lr 0.000125
+Epoch 47: 
+ train_loss 1.3699, train_acc 0.4767, train_f1 0.4699 
+dev_loss 1.3961, dev_acc 0.4543, dev_f1 0.4428, lr 0.000125
+Epoch 48: 
+ train_loss 1.3754, train_acc 0.4772, train_f1 0.4725 
+dev_loss 1.3669, dev_acc 0.4677, dev_f1 0.4565, lr 0.000125
+Epoch 49: 
+ train_loss 1.3683, train_acc 0.4737, train_f1 0.4660 
+dev_loss 1.3763, dev_acc 0.4758, dev_f1 0.4687, lr 0.000125
+No dev‑accuracy gain for 10 epochs – early stopping at epoch 50. Best dev accuracy: 0.4785
+Loaded best checkpoint: D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\baseline\logs\baseline.py-bs=24,d=0.4,e=100,ls=0.05,l=0.001,p=10,s=42,t=1\best_model_t0.4673_d0.4785.pt
+Predictions saved to D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\baseline\logs\baseline.py-bs=24,d=0.4,e=100,ls=0.05,l=0.001,p=10,s=42,t=1\predictions.csv

@@ -1,0 +1,95 @@
+# Logging to D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\no_cbam\logs\no_cbam.py-bs=24,d=0.4,e=100,ls=0.05,l=0.001,p=10,s=42,t=1\train.log   (2025-09-15T13:32:04)
+Logging training history to D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\no_cbam\logs\no_cbam.py-bs=24,d=0.4,e=100,ls=0.05,l=0.001,p=10,s=42,t=1\history.csv
+Epoch 1: 
+ train_loss 1.7703, train_acc 0.2695, train_f1 0.2597 
+dev_loss 1.5601, dev_acc 0.3723, dev_f1 0.3483, lr 0.001000
+Epoch 2: 
+ train_loss 1.6202, train_acc 0.3394, train_f1 0.3219 
+dev_loss 1.5444, dev_acc 0.3858, dev_f1 0.3588, lr 0.001000
+Epoch 3: 
+ train_loss 1.5865, train_acc 0.3516, train_f1 0.3338 
+dev_loss 1.6456, dev_acc 0.3468, dev_f1 0.3182, lr 0.001000
+Epoch 4: 
+ train_loss 1.5600, train_acc 0.3721, train_f1 0.3603 
+dev_loss 1.4444, dev_acc 0.4368, dev_f1 0.4358, lr 0.001000
+Epoch 5: 
+ train_loss 1.5402, train_acc 0.3893, train_f1 0.3786 
+dev_loss 1.4456, dev_acc 0.4368, dev_f1 0.4277, lr 0.001000
+Epoch 6: 
+ train_loss 1.5260, train_acc 0.3970, train_f1 0.3892 
+dev_loss 1.4456, dev_acc 0.4395, dev_f1 0.4210, lr 0.001000
+Epoch 7: 
+ train_loss 1.4994, train_acc 0.4109, train_f1 0.4021 
+dev_loss 1.5348, dev_acc 0.4032, dev_f1 0.3859, lr 0.001000
+Epoch 8: 
+ train_loss 1.4750, train_acc 0.4309, train_f1 0.4236 
+dev_loss 1.3590, dev_acc 0.4731, dev_f1 0.4683, lr 0.001000
+Epoch 9: 
+ train_loss 1.4476, train_acc 0.4329, train_f1 0.4279 
+dev_loss 1.3433, dev_acc 0.4946, dev_f1 0.4773, lr 0.001000
+Epoch 10: 
+ train_loss 1.4323, train_acc 0.4519, train_f1 0.4489 
+dev_loss 1.2917, dev_acc 0.5000, dev_f1 0.4872, lr 0.001000
+Epoch 11: 
+ train_loss 1.4083, train_acc 0.4697, train_f1 0.4672 
+dev_loss 2.0499, dev_acc 0.2863, dev_f1 0.2258, lr 0.001000
+Epoch 12: 
+ train_loss 1.3986, train_acc 0.4730, train_f1 0.4704 
+dev_loss 1.3123, dev_acc 0.5215, dev_f1 0.5196, lr 0.001000
+Epoch 13: 
+ train_loss 1.3639, train_acc 0.4964, train_f1 0.4943 
+dev_loss 1.2504, dev_acc 0.5470, dev_f1 0.5421, lr 0.001000
+Epoch 14: 
+ train_loss 1.3366, train_acc 0.4984, train_f1 0.4964 
+dev_loss 1.3350, dev_acc 0.4812, dev_f1 0.4641, lr 0.001000
+Epoch 15: 
+ train_loss 1.3270, train_acc 0.5001, train_f1 0.4981 
+dev_loss 1.2805, dev_acc 0.5215, dev_f1 0.5200, lr 0.001000
+Epoch 16: 
+ train_loss 1.2972, train_acc 0.5234, train_f1 0.5220 
+dev_loss 1.2696, dev_acc 0.5417, dev_f1 0.5352, lr 0.001000
+Epoch 17: 
+ train_loss 1.2817, train_acc 0.5355, train_f1 0.5346 
+dev_loss 1.4071, dev_acc 0.4839, dev_f1 0.4892, lr 0.001000
+Epoch 18: 
+ train_loss 1.2754, train_acc 0.5429, train_f1 0.5413 
+dev_loss 1.2663, dev_acc 0.5444, dev_f1 0.5360, lr 0.000500
+Epoch 19: 
+ train_loss 1.2029, train_acc 0.5694, train_f1 0.5682 
+dev_loss 1.2222, dev_acc 0.5618, dev_f1 0.5576, lr 0.000500
+Epoch 20: 
+ train_loss 1.1541, train_acc 0.5955, train_f1 0.5946 
+dev_loss 1.2299, dev_acc 0.5551, dev_f1 0.5484, lr 0.000500
+Epoch 21: 
+ train_loss 1.1313, train_acc 0.6005, train_f1 0.6001 
+dev_loss 1.2020, dev_acc 0.5766, dev_f1 0.5764, lr 0.000500
+Epoch 22: 
+ train_loss 1.1138, train_acc 0.6185, train_f1 0.6179 
+dev_loss 1.4440, dev_acc 0.4919, dev_f1 0.4858, lr 0.000500
+Epoch 23: 
+ train_loss 1.0987, train_acc 0.6217, train_f1 0.6212 
+dev_loss 1.2433, dev_acc 0.5511, dev_f1 0.5508, lr 0.000500
+Epoch 24: 
+ train_loss 1.0559, train_acc 0.6418, train_f1 0.6417 
+dev_loss 1.2718, dev_acc 0.5349, dev_f1 0.5366, lr 0.000500
+Epoch 25: 
+ train_loss 1.0406, train_acc 0.6485, train_f1 0.6489 
+dev_loss 1.2870, dev_acc 0.5430, dev_f1 0.5423, lr 0.000500
+Epoch 26: 
+ train_loss 1.0183, train_acc 0.6677, train_f1 0.6680 
+dev_loss 1.3098, dev_acc 0.5417, dev_f1 0.5390, lr 0.000250
+Epoch 27: 
+ train_loss 0.9547, train_acc 0.6972, train_f1 0.6976 
+dev_loss 1.3026, dev_acc 0.5457, dev_f1 0.5457, lr 0.000250
+Epoch 28: 
+ train_loss 0.9133, train_acc 0.7127, train_f1 0.7132 
+dev_loss 1.3279, dev_acc 0.5484, dev_f1 0.5431, lr 0.000250
+Epoch 29: 
+ train_loss 0.8878, train_acc 0.7270, train_f1 0.7276 
+dev_loss 1.3271, dev_acc 0.5524, dev_f1 0.5522, lr 0.000250
+Epoch 30: 
+ train_loss 0.8791, train_acc 0.7342, train_f1 0.7349 
+dev_loss 1.3552, dev_acc 0.5524, dev_f1 0.5526, lr 0.000250
+No dev‑accuracy gain for 10 epochs – early stopping at epoch 31. Best dev accuracy: 0.5766
+Loaded best checkpoint: D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\no_cbam\logs\no_cbam.py-bs=24,d=0.4,e=100,ls=0.05,l=0.001,p=10,s=42,t=1\best_model_t0.7565_d0.5995.pt
+Predictions saved to D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\no_cbam\logs\no_cbam.py-bs=24,d=0.4,e=100,ls=0.05,l=0.001,p=10,s=42,t=1\predictions.csv
