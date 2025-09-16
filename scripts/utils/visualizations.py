@@ -73,7 +73,7 @@ def plot_class_distribution(
 
     fig.tight_layout()
     p_overall = outdir / "00_class_distribution_overall.png"
-    fig.savefig(p_overall, dpi=300)
+    fig.savefig(p_overall, dpi=500)
     plt.close(fig)
     out_paths["overall"] = p_overall
 
@@ -120,16 +120,16 @@ def plot_class_distribution(
                 ax.text(x_pos, h + off_hi, f"{int(h)}", ha="center", va="bottom", fontsize=8)
                 ax.text(x_pos, h + off_lo, f"{pct_val:.1f}%", ha="center", va="bottom", fontsize=8)
 
-        ax.set_title(f"{title_prefix} – by split")
+        ax.set_title(f"{title_prefix} - by split")
         ax.set_xlabel("Class")
-        ax.set_ylabel("Count, Proportions")
+        ax.set_ylabel("Count")
         ax.set_xticks(x)
         ax.set_xticklabels(classes, rotation=0)
         ax.legend(title=split)
 
         fig.tight_layout()
         p_split = outdir / "01_class_distribution_by_split.png"
-        fig.savefig(p_split, dpi=300)
+        fig.savefig(p_split, dpi=500)
         plt.close(fig)
         out_paths["by_split"] = p_split
 
@@ -168,31 +168,36 @@ def plot_training_history(
     out_paths: dict[str, Path] = {}
 
     def _plot(col: str, ylabel: str) -> None:
-        fig, ax = plt.subplots(figsize=(9, 5))
+        # widen figure a bit based on number of epochs (capped)
+        width = min(18, 8 + 0.06 * len(epochs))  # tweak if you want more/less space
+        fig, ax = plt.subplots(figsize=(width, 5))
+
         ax.plot(train_df["epoch"], train_df[col], label="train")
         ax.plot(dev_df["epoch"],   dev_df[col],   label="dev")
 
-        # choose best dev point per metric (loss=min, others=max)
-        if col == "loss":
-            idx = dev_df[col].idxmin()
-        else:
-            idx = dev_df[col].idxmax()
+        # best dev point per metric (loss=min, others=max)
+        idx = dev_df[col].idxmin() if col == "loss" else dev_df[col].idxmax()
         best_epoch = int(dev_df.loc[idx, "epoch"])
         best_value = float(dev_df.loc[idx, col])
 
         # vertical markers
         ax.axvline(early_stop_epoch, color="red",   linestyle="--", label="early stop")
-        ax.axvline(best_epoch,       color="green", linestyle=":",  label=f"best validation {ylabel.lower()}")
+        ax.axvline(
+            best_epoch,
+            color="green",
+            linestyle=":",
+            label=f"best dev {ylabel.lower()} = {best_value:.4f}",
+        )
 
         # green dot at best dev point
         ax.scatter([best_epoch], [best_value], color="green", zorder=5)
 
-        # axis labels/title
+        # labels/title
         ax.set_xlabel("Epoch")
         ax.set_ylabel(ylabel)
         ax.set_title(f"{title_prefix} – {ylabel}")
 
-        # integer ticks on x-axis
+        # integer ticks + full list of epochs
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         if epochs.size == 1:
             ax.set_xlim(epochs[0] - 0.5, epochs[0] + 0.5)
@@ -201,13 +206,18 @@ def plot_training_history(
             ax.set_xlim(epochs.min() - 0.5, epochs.max() + 0.5)
             ax.set_xticks(epochs)
 
+        # rotate tick labels so they fit better
+        ax.tick_params(axis="x", rotation=45)
+        for tick in ax.get_xticklabels():
+            tick.set_ha("right")
+
         ax.grid(True, alpha=0.3)
         ax.legend()
         fig.tight_layout()
 
         filename = f"{model_name}_{col}.png"
         out_path = outdir / filename
-        fig.savefig(out_path, dpi=300)
+        fig.savefig(out_path, dpi=500)
         plt.close(fig)
         out_paths[col] = out_path
 
@@ -323,7 +333,7 @@ def plot_confusion_matrix(
 
     slug = (model_name or "model").replace(" ", "_")
     out_path = outdir / f"{slug}_confusion_matrix.png"
-    fig.savefig(out_path, dpi=300)
+    fig.savefig(out_path, dpi=500)
     plt.close(fig)
 
     return out_path
