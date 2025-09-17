@@ -203,13 +203,11 @@ def plot_training_history(
             ax.set_xlim(epochs[0] - 0.5, epochs[0] + 0.5)
             ax.set_xticks([int(epochs[0])])
         else:
-            ax.set_xlim(epochs.min() - 0.5, epochs.max() + 0.5)
-            ax.set_xticks(epochs)
-
-        # rotate tick labels so they fit better
-        ax.tick_params(axis="x", rotation=45)
-        for tick in ax.get_xticklabels():
-            tick.set_ha("right")
+            start = 0
+            end = int(epochs.max())
+            ax.set_xlim(start - 0.5, end + 0.5)
+            ticks = np.arange(start, end + 1, 5, dtype=int)
+            ax.set_xticks(ticks)
 
         ax.grid(True, alpha=0.3)
         ax.legend()

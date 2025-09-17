@@ -1,0 +1,35 @@
+# Logging to D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\baseline\logs\baseline.py-bs=24,d=0.4,e=10,ls=0.05,l=0.001,p=10,s=42,t=1\train.log   (2025-09-17T14:09:41)
+Using device: cuda
+Logging training history to D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\baseline\logs\baseline.py-bs=24,d=0.4,e=10,ls=0.05,l=0.001,p=10,s=42,t=1\history.csv
+Epoch 1: 
+ train_loss 1.6435, train_acc 0.3130, train_f1 0.2815 
+dev_loss 1.5715, dev_acc 0.3575, dev_f1 0.2719, lr 0.001000
+Epoch 2: 
+ train_loss 1.5698, train_acc 0.3661, train_f1 0.3310 
+dev_loss 1.5458, dev_acc 0.3817, dev_f1 0.3341, lr 0.001000
+Epoch 3: 
+ train_loss 1.5724, train_acc 0.3589, train_f1 0.3253 
+dev_loss 1.5126, dev_acc 0.3831, dev_f1 0.3385, lr 0.001000
+Epoch 4: 
+ train_loss 1.5473, train_acc 0.3787, train_f1 0.3521 
+dev_loss 1.5199, dev_acc 0.3978, dev_f1 0.3467, lr 0.001000
+Epoch 5: 
+ train_loss 1.5354, train_acc 0.3835, train_f1 0.3574 
+dev_loss 1.6180, dev_acc 0.3333, dev_f1 0.2842, lr 0.001000
+Epoch 6: 
+ train_loss 1.5261, train_acc 0.3879, train_f1 0.3655 
+dev_loss 1.5098, dev_acc 0.3858, dev_f1 0.3615, lr 0.001000
+Epoch 7: 
+ train_loss 1.5023, train_acc 0.3929, train_f1 0.3761 
+dev_loss 1.5399, dev_acc 0.3965, dev_f1 0.3643, lr 0.001000
+Epoch 8: 
+ train_loss 1.5065, train_acc 0.3978, train_f1 0.3823 
+dev_loss 1.4688, dev_acc 0.4032, dev_f1 0.3644, lr 0.001000
+Epoch 9: 
+ train_loss 1.4896, train_acc 0.4119, train_f1 0.3977 
+dev_loss 1.4689, dev_acc 0.4167, dev_f1 0.3876, lr 0.001000
+Epoch 10: 
+ train_loss 1.4758, train_acc 0.4136, train_f1 0.4008 
+dev_loss 1.4030, dev_acc 0.4355, dev_f1 0.4294, lr 0.001000
+No best_model_*.pt found – using last in-memory weights.
+Predictions saved to D:\Projects\GitRepositories\CentralVoice-JEM207\scripts\models\baseline\logs\baseline.py-bs=24,d=0.4,e=10,ls=0.05,l=0.001,p=10,s=42,t=1\predictions.csv
