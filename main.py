@@ -147,7 +147,7 @@ def _classify_audio_file(models: list[str], audio_path: str) -> None:
     for m in models:
         try:
             script_path = _resolve_model_script(m)
-            logs_root = script_path / "logs"
+            logs_root = script_path.parent / "logs"
             run_dir = _pick_logs_run_dir(logs_root)
             ckpts = sorted(run_dir.glob("best_model_*.pt"))
             if not ckpts:
