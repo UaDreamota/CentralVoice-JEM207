@@ -149,10 +149,6 @@ def plot_training_history(
     df = pd.read_csv(history_csv)
     outdir.mkdir(parents=True, exist_ok=True)
 
-    model_name = history_csv.parent.parent.stem
-    if title_prefix is None:
-        title_prefix = model_name
-
     required_cols = {"epoch", "split", "loss", "acc", "macro_f1"}
     missing = required_cols - set(df.columns)
     if missing:
@@ -213,7 +209,7 @@ def plot_training_history(
         ax.legend()
         fig.tight_layout()
 
-        filename = f"{model_name}_{col}.png"
+        filename = f"{title_prefix}_{col}.png"
         out_path = outdir / filename
         fig.savefig(out_path, dpi=500)
         plt.close(fig)
