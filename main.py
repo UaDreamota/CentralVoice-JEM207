@@ -441,6 +441,7 @@ def main() -> None:
     3. Optionally visualize class imbalance.
     4. Optionally train one or more model variants selected by the user.
     5. Optionally visualize training logs (loss, accuracy, macro-F1).
+    6. Optionally classify a user-provided audio clip (<=10s).
 
     Notes
     -----
@@ -538,7 +539,7 @@ def main() -> None:
     training_question = input("Do you wish to train the model? [y/n]: ").strip().lower()
     if training_question == "y":
 
-        model_choice = input("Which models do you wish to train? [CBAM, NO_CBAM, baseline]: ").strip().lower()
+        model_choice = input("Which models do you wish to train? [baseline, no_cbam, cbam]: ").strip().lower()
         models = _parse_model_list(model_choice)
         print("Selected models (in order):", ", ".join(models))
 
@@ -596,7 +597,7 @@ def main() -> None:
         print("Training model terminated.")
         view_existing = input("Do you want to view existing training log visualizations? [y/n]: ").strip().lower()
         if view_existing == "y":
-            model_choice = input("Which model reports do you want to view? [CNN+CBAM, CNN, baseline]: ").strip().lower()
+            model_choice = input("Which model reports do you want to view? [baseline, no_cbam, cbam]: ").strip().lower()
             models_to_view = _parse_model_list(model_choice)
 
             for m in models_to_view:
@@ -625,7 +626,7 @@ def main() -> None:
         # ─────────────────────────────────────────────────────────────
         custom_question = input("Do you want to classify your own audio clip (<=10s)? [y/n]: ").strip().lower()
         if custom_question == "y":
-            model_choice = input("Which models should classify the clip? [CBAM, NO_CBAM, baseline]: ").strip().lower()
+            model_choice = input("Which models should classify the clip? [baseline, no_cbam, cbam]: ").strip().lower()
             models = _parse_model_list(model_choice)
             audio_path = input("Path to WAV/MP3 file: ").strip()
             _classify_audio_file(models, audio_path)
