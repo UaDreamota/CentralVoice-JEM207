@@ -7,7 +7,7 @@
 [![Author 2](https://img.shields.io/badge/Mykyta%20Huskov-LinkedIn-green?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/mykytahuskov)
 ---
 > End-to-end Speech Emotion Recognition \
-> From raw audio to trained models, developed for the JEM207 course.  
+> From raw audio to trained models, developed for the course at IES in Charles University JEM207.  
 > Current version classifies six emotions using the CREMA-D dataset.
 ---
 
@@ -54,7 +54,6 @@ CentralVoice-JEM207/
 │   ├── models/          # Baseline and experimental CNN models
 │   └── utils/           # Data download, logging, evaluation utilities
 ├── docs/                # Usage and setup guides
-├── notebooks/           # Exploratory notebooks
 ├── reports/             # Generated reports and figures
 └── requirements.txt
 ```
