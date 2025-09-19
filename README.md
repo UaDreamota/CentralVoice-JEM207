@@ -39,12 +39,15 @@
 main.py is the file that manages all parts of the script. It handles all the steps of the project.
 In order to start run main.py:
 
-```bash
-python main.py
-```
+   ```bash
+   python main.py
+   ```
 
 Common workflows are documented in
 [docs/Running.md](docs/Running.md).
+
+You can also find our full report in
+[reports/data_and_modelling_report.pdf](reports/data_and_modelling_report.pdf)
 
 ## Project Structure
 ```

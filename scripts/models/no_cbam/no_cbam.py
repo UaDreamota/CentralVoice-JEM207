@@ -226,7 +226,7 @@ def main(args: argparse.Namespace) -> None:
     setup_logging(args.logdir)
 
     # 2) data ---------------------------------------------------------------------------
-    train_dl, dev_dl, test_dl = create_dataloaders(args.batch_size)
+    train_dl, dev_dl, test_dl = create_dataloaders(args.batch_size, seed=args.seed)
 
     # 3) model --------------------------------------------------------------------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

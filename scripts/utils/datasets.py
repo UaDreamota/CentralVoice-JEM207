@@ -209,7 +209,14 @@ class TrainTransform:
         self.noise_abs_max = float(noise_abs_max)
         self.shift_mode = shift_mode
         self.p_aug = float(p_aug)
-        self.rng = rng or random.Random()
+        if rng is None:
+            self.rng = random.Random()
+            # Mirror the state of Python's global RNG so that calling
+            # `random.seed(...)` in the training script is sufficient to make
+            # the augmentation deterministic across runs.
+            self.rng.setstate(random.getstate())
+        else:
+            self.rng = rng
 
     def _time_shift_inplace(self, x: torch.Tensor, k: int) -> None:
         """Shift along last dim by k frames; zero-fill the wrapped chunk if shift_mode == 'zero'."""
@@ -354,17 +361,32 @@ def create_dataloaders(
     batch_size: int,
     time_length: int = 218,
     freq_mask_param: int = 15,
-    time_mask_param: int = 25
+    time_mask_param: int = 25,
+    *,
+    seed: int | None = None,
+    rng: Optional[random.Random] = None,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Create train, dev, and test dataloaders for CREMA-D using
     CremadPrecompDataset. Pass the appropriate transforms into each.
     """
+    if rng is not None and seed is not None:
+        raise ValueError("Pass either 'seed' or 'rng', not both.")
+
+    train_rng: random.Random
+    if rng is not None:
+        train_rng = rng
+    elif seed is not None:
+        train_rng = random.Random(seed)
+    else:
+        train_rng = random.Random()
+        train_rng.setstate(random.getstate())
     # 1. Instantiate the transforms
     train_transform = get_train_transform(
         time_length=time_length,
         freq_mask_param=freq_mask_param,
-        time_mask_param=time_mask_param
+        time_mask_param=time_mask_param,
+        rng=train_rng,
     )
     dev_transform = get_dev_transform(time_length=time_length)
 
