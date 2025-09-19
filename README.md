@@ -5,6 +5,7 @@
 [![Dataset](https://img.shields.io/badge/dataset-CREMA--D-orange.svg)](https://github.com/CheyneyComputerScience/CREMA-D)
 [![Author 1](https://img.shields.io/badge/Arsenii%20Rybchenko-LinkedIn-pink?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/arsenii-rybchenko-841b38278/)
 [![Author 2](https://img.shields.io/badge/Mykyta%20Huskov-LinkedIn-green?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/mykytahuskov)
+[![Report](https://img.shields.io/badge/Technical%20Report-PDF-white?logo=TechnicalReport&logoColor=white)](reports/data_and_modelling_report.pdf)
 ---
 > End-to-end Speech Emotion Recognition \
 > From raw audio to trained models, developed for the course at IES in Charles University JEM207.  
@@ -53,6 +54,7 @@ You can also find our full report in
 ```
 CentralVoice-JEM207/
 ├── main.py              # Entry script (start here)
+├── data                 # Downloaded data  
 ├── papers               # Cited and heavily used papers
 ├── scripts/
 │   ├── models/          # Baseline and experimental CNN models

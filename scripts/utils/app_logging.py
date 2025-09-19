@@ -1,4 +1,4 @@
-# utils/app_logging.py
+#scripts/utils/app_logging.py
 
 """
 Utility functions and classes for setting up logging during training runs.

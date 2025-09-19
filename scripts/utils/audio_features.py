@@ -1,4 +1,4 @@
-#utils/audio_features.py
+#scripts/utils/audio_features.py
 """
 Script to extract audio features and all the attached helpers
 """

@@ -1,4 +1,4 @@
-#utils/create_labels.py
+#scripts/utils/create_labels.py
 """
 Script that handles labels and train/dev/test split
 """
