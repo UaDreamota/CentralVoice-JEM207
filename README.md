@@ -53,14 +53,14 @@ You can also find our full report in
 ```
 CentralVoice-JEM207/
 ├── main.py              # Entry script (start here)
-├── docs                 # Documentation and guides
+├── papers               # Cited and heavily used papers
 ├── scripts/
 │   ├── models/          # Baseline and experimental CNN models
 │   │   ├── baseline     # Baseline CNN model
 │   │   ├── no_cbam      # CNN model without attention
 │   │   └── cbam         # CNN model with CBAM attention
 │   └── utils/           # Data download, logging, evaluation utilities
-├── docs/                # Usage and setup guides
+├── docs                 # Usage and setup guides
 ├── reports/             # Generated reports and figures
 └── requirements.txt
 ```

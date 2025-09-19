@@ -65,6 +65,23 @@ python scripts/utils/audio_features.py data/unprocessed/crema-d/AudioWAV --out d
 python scripts/utils/create_labels.py data/processed
 ```
 
+After feature extraction, `main.py` prompts to visualize class imbalance:
+
+```bash
+python main.py
+# When prompted:
+# Do you want to visualize class imbalance now? [y/n]: y
+# Saved class distribution plots:
+#  - D:\Projects\GitRepositories\CentralVoice-JEM207\reports\data_overview\00_class_distribution_overall.png
+#  - D:\Projects\GitRepositories\CentralVoice-JEM207\reports\data_overview\01_class_distribution_by_split.png
+
+```
+
+You will be prompted to vizualize the class imabalance. If you choose "y", 
+new figure will be saved under `reports/data_overview`.
+
+It will include the distribution of classes in the dataset.
+
 ## 3. Train a model
 
 Start training via `main.py` and select one or more model variants:
@@ -105,10 +122,11 @@ After training the model, rerun the main.py script. Now, if you decline
 training the model, you can choose to classify your own audio clip. 
 
 ```bash
-Do you wish to train the model? [y/n]: n
-Training model terminated.
-Do you want to view existing training log visualizations? [y/n]: n
-Do you want to classify your own audio clip (<=10s)? [y/n]: 
+python main.py
+# Do you wish to train the model? [y/n]: n
+# Training model terminated.
+# Do you want to view existing training log visualizations? [y/n]: n
+# Do you want to classify your own audio clip (<=10s)? [y/n]: 
 ```
 
 Type "y" to the terminal. You will be prompted to choose models, 
