@@ -484,7 +484,7 @@ def main() -> None:
                 print("Unknown choice. Exiting.")
                 return
         else:
-            print("You may now only run the inference script, as the data is missing.")
+            print("You need to download the data to proceed. Exiting.")
             return
     else: 
         # Data exists; try to identify scope
